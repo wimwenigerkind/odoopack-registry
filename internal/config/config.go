@@ -20,6 +20,13 @@ func LoadConfig() {
 	viper.SetDefault("db.password", "postgres")
 	viper.SetDefault("db.name", "odoopack-registry")
 
+	viper.SetDefault("storage.driver", "local")
+	viper.SetDefault("storage.local.root", "./data/storage")
+	viper.SetDefault("storage.local.public_url", "http://localhost:6969/zipball")
+
+	viper.SetDefault("worker.count", 2)
+	viper.SetDefault("worker.queue_size", 64)
+
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 

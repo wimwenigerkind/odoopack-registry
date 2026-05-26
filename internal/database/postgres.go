@@ -24,7 +24,7 @@ func Connect() (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return db, err
+	return db, nil
 }
 
 func Migrate(db *gorm.DB) error {
