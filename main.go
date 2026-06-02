@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
@@ -60,8 +62,15 @@ func main() {
 	authHandler := handler.NewAuthHandler(authRegistry, stateStore, sessionStore, userRepo, viper.GetBool("auth.cookie_secure"))
 
 	r := gin.Default()
-	// Don't trust any X-Forwarded-* headers by default; operators who run
-	// behind a known reverse proxy can re-enable via config later.
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     viper.GetStringSlice("cors.allowed_origins"),
+		AllowMethods:     []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Authorization", "Content-Type"},
+		AllowCredentials: false,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	if err := r.SetTrustedProxies(nil); err != nil {
 		log.Fatalf("trusted proxies: %v", err)
 	}
