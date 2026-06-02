@@ -7,9 +7,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
+	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
 	"github.com/wimwenigerkind/odoopack-registry/internal/config"
 	"github.com/wimwenigerkind/odoopack-registry/internal/database"
 	"github.com/wimwenigerkind/odoopack-registry/internal/handler"
+	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
 	"github.com/wimwenigerkind/odoopack-registry/internal/worker"
@@ -33,19 +35,38 @@ func main() {
 
 	addonRepo := repository.NewAddonRepository(db)
 	versionRepo := repository.NewAddonVersionRepository(db)
+	userRepo := repository.NewUserRepository(db)
 
-	queue := worker.NewQueue(versionRepo, store, viper.GetInt("worker.queue_size"))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	queue := worker.NewQueue(versionRepo, store, viper.GetInt("worker.queue_size"))
 	queue.Start(ctx, viper.GetInt("worker.count"))
+
+	authProviders, err := auth.LoadProviders(ctx, viper.GetString("base_url"))
+	if err != nil {
+		log.Fatalf("auth providers: %v", err)
+	}
+	authRegistry := auth.NewRegistry(authProviders)
+	stateStore := auth.NewStateStore()
+	defer stateStore.Stop()
+	sessionStore := auth.NewSessionStore()
+	defer sessionStore.Stop()
 
 	addonHandler := handler.NewAddonHandler(addonRepo)
 	downloadHandler := handler.NewDownloadHandler(addonRepo, versionRepo, store)
 	triggerHandler := handler.NewTriggerHandler(addonRepo, queue)
 	registryHandler := handler.NewRegistryHandler(addonRepo, store)
+	authHandler := handler.NewAuthHandler(authRegistry, stateStore, sessionStore, userRepo, viper.GetBool("auth.cookie_secure"))
 
 	r := gin.Default()
-	registerRoutes(r, addonHandler, downloadHandler, triggerHandler, registryHandler)
+	// Don't trust any X-Forwarded-* headers by default; operators who run
+	// behind a known reverse proxy can re-enable via config later.
+	if err := r.SetTrustedProxies(nil); err != nil {
+		log.Fatalf("trusted proxies: %v", err)
+	}
+	requireAuth := middleware.RequireAuth(sessionStore)
+	registerRoutes(r, addonHandler, downloadHandler, triggerHandler, registryHandler, authHandler, requireAuth)
 
 	if viper.GetString("storage.driver") == "local" {
 		r.Static("/zipball", viper.GetString("storage.local.root"))
@@ -70,8 +91,8 @@ func buildStorage() (storage.Storage, error) {
 	}
 }
 
-func registerRoutes(r *gin.Engine, addons *handler.AddonHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler) {
-	api := r.Group("/api/v1")
+func registerRoutes(r *gin.Engine, addons *handler.AddonHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, requireAuth gin.HandlerFunc) {
+	api := r.Group("/api/v1", requireAuth)
 	{
 		api.GET("/addons", addons.List)
 		api.POST("/addons", addons.Register)
@@ -84,4 +105,12 @@ func registerRoutes(r *gin.Engine, addons *handler.AddonHandler, downloads *hand
 	{
 		reg.GET("/addons/*name", registry.Get)
 	}
+
+	r.GET("/auth/providers", authH.ListProviders)
+	a := r.Group("/auth/:provider")
+	{
+		a.GET("/login", authH.Login)
+		a.GET("/callback", authH.Callback)
+	}
+	r.POST("/auth/logout", requireAuth, authH.Logout)
 }

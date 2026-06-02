@@ -13,6 +13,7 @@ func LoadConfig() {
 	viper.AddConfigPath(".")
 
 	viper.SetDefault("server_address", "0.0.0.0:6969")
+	viper.SetDefault("base_url", "http://localhost:6969")
 
 	viper.SetDefault("db.host", "localhost")
 	viper.SetDefault("db.port", "5432")
