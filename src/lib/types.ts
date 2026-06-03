@@ -3,6 +3,7 @@ export interface User {
   created_at: string
   updated_at: string
   username: string
+  email: string
   identities?: Identity[]
 }
 
@@ -10,7 +11,6 @@ export interface Identity {
   id: string
   created_at: string
   updated_at: string
-  email: string
   provider: string
   user_id: string
 }
@@ -52,6 +52,8 @@ export interface Addon {
   git_url: string
   default_branch: string
   visibility: Visibility
+  owner_id: string
+  owner?: User
   versions?: AddonVersion[]
 }
 
