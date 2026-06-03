@@ -2,6 +2,7 @@ import {Outlet} from "react-router";
 import {useMe} from "@/hooks/auth/use-me.ts";
 import {useProviders} from "@/hooks/auth/use-providers.ts";
 import {useLogout} from "@/hooks/auth/use-logout.ts";
+import {Avatar} from "@/components/avatar";
 
 export default function RootLayout() {
   const {data: user, isLoading: meLoading, isError: meError} = useMe()
@@ -25,7 +26,10 @@ export default function RootLayout() {
         <p>Could not check login state. Try reloading.</p>
       ) : user ? (
         <section>
-          <h2>Logged in as {displayName}</h2>
+          <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Avatar email={user.email} size={32} />
+            Logged in as {displayName}
+          </h2>
           <button
             onClick={() => logout.mutate()}
             disabled={logout.isPending}

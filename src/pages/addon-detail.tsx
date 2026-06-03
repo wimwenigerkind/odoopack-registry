@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router"
 import { useAddon } from "@/hooks/addons/use-addon"
 import { useMe } from "@/hooks/auth/use-me"
 import { useSyncAddon } from "@/hooks/addons/use-sync-addon"
+import { Avatar } from "@/components/avatar"
 import type { VersionStatus } from "@/lib/types"
 
 export default function AddonDetailPage() {
@@ -27,7 +28,10 @@ export default function AddonDetailPage() {
 
       <dl>
         <dt>Owner</dt>
-        <dd>{addon.owner?.username ?? "—"}</dd>
+        <dd style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {addon.owner?.email && <Avatar email={addon.owner.email} size={24} />}
+          {addon.owner?.username ?? "—"}
+        </dd>
         <dt>Visibility</dt>
         <dd>{addon.visibility}</dd>
         <dt>Git URL</dt>
