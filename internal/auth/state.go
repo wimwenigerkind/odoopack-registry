@@ -12,6 +12,7 @@ type FlowState struct {
 	Provider string
 	Nonce    string
 	Verifier string
+	ReturnTo string
 }
 
 type stateEntry struct {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -77,6 +78,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Provider: provider.Name(),
 		Nonce:    nonce,
 		Verifier: verifier,
+		ReturnTo: sanitizeReturnTo(c.Query("return_to")),
 	}, loginTTL); err != nil {
 		internalError(c, "save state", err)
 		return
@@ -161,7 +163,27 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	}
 	h.writeCookie(c, auth.SessionCookieName, sess.ID, sessionCookiePath, int(sessionTTL.Seconds()))
 
-	c.JSON(http.StatusOK, gin.H{"user_id": user.ID})
+	returnTo := fs.ReturnTo
+	if returnTo == "" {
+		returnTo = "/"
+	}
+	c.Redirect(http.StatusFound, returnTo)
+}
+
+func sanitizeReturnTo(p string) string {
+	if p == "" {
+		return ""
+	}
+	if !strings.HasPrefix(p, "/") {
+		return ""
+	}
+	if strings.HasPrefix(p, "//") {
+		return ""
+	}
+	if strings.Contains(p, "\\") || strings.Contains(p, "\n") || strings.Contains(p, "\r") {
+		return ""
+	}
+	return p
 }
 
 func (h *AuthHandler) findOrCreateUser(provider auth.Provider, identity models.Identity) (*models.User, error) {
