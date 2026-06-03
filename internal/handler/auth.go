@@ -132,14 +132,14 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 		return
 	}
 
-	identity, err := provider.Exchange(c.Request.Context(), code, fs.Verifier, fs.Nonce)
+	subject, email, emailVerified, err := provider.Exchange(c.Request.Context(), code, fs.Verifier, fs.Nonce)
 	if err != nil {
 		log.Printf("auth callback: exchange %q: %v", providerName, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication failed"})
 		return
 	}
 
-	user, err := h.findOrCreateUser(provider, identity)
+	user, err := h.findOrCreateUser(provider, subject, email, emailVerified)
 	if err != nil {
 		switch {
 		case errors.Is(err, errRegistrationDisabled):
@@ -170,6 +170,15 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	c.Redirect(http.StatusFound, returnTo)
 }
 
+// FIXME: username already exists
+func deriveUsername(email string) string {
+	at := strings.Index(email, "@")
+	if at <= 0 {
+		return ""
+	}
+	return email[:at]
+}
+
 func sanitizeReturnTo(p string) string {
 	if p == "" {
 		return ""
@@ -186,8 +195,8 @@ func sanitizeReturnTo(p string) string {
 	return p
 }
 
-func (h *AuthHandler) findOrCreateUser(provider auth.Provider, identity models.Identity) (*models.User, error) {
-	user, err := h.users.GetByIdentity(identity.Provider, identity.Subject)
+func (h *AuthHandler) findOrCreateUser(provider auth.Provider, subject, email string, emailVerified bool) (*models.User, error) {
+	user, err := h.users.GetByIdentity(provider.Name(), subject)
 	if err == nil {
 		return user, nil
 	}
@@ -197,18 +206,20 @@ func (h *AuthHandler) findOrCreateUser(provider auth.Provider, identity models.I
 	if !provider.AllowRegister() {
 		return nil, errRegistrationDisabled
 	}
-	if identity.Email == "" || !identity.EmailVerified {
+	if email == "" || !emailVerified {
 		return nil, errEmailNotVerified
 	}
 
-	newUser := &models.User{}
+	newUser := &models.User{
+		Email:    email,
+		Username: deriveUsername(email),
+	}
 	newIdentity := &models.Identity{
-		Subject:  identity.Subject,
-		Email:    identity.Email,
-		Provider: identity.Provider,
+		Subject:  subject,
+		Provider: provider.Name(),
 	}
 	if err := h.users.CreateWithIdentity(newUser, newIdentity); err != nil {
-		if u, lookupErr := h.users.GetByIdentity(identity.Provider, identity.Subject); lookupErr == nil {
+		if u, lookupErr := h.users.GetByIdentity(provider.Name(), subject); lookupErr == nil {
 			return u, nil
 		}
 		return nil, err

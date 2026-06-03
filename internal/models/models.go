@@ -44,6 +44,7 @@ type Addon struct {
 	Visibility    Visibility     `gorm:"not null;default:public" json:"visibility"`
 	WebhookSecret string         `gorm:"not null" json:"-"`
 	OwnerID       uuid.UUID      `gorm:"type:uuid;not null;index" json:"owner_id"`
+	Owner         *User          `json:"owner,omitempty"`
 	Versions      []AddonVersion `json:"versions,omitempty"`
 }
 

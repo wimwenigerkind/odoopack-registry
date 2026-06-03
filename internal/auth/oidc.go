@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"golang.org/x/oauth2"
 )
 
@@ -44,10 +43,10 @@ func NewOIDCProvider(ctx context.Context, name string, cfg OIDCConfig, redirectU
 	}, nil
 }
 
-func (p *OidcProvider) Name() string         { return p.name }
-func (p *OidcProvider) Type() ProviderType   { return OIDC }
-func (p *OidcProvider) AllowLogin() bool     { return p.cfg.AllowLogin }
-func (p *OidcProvider) AllowRegister() bool  { return p.cfg.AllowRegister }
+func (p *OidcProvider) Name() string        { return p.name }
+func (p *OidcProvider) Type() ProviderType  { return OIDC }
+func (p *OidcProvider) AllowLogin() bool    { return p.cfg.AllowLogin }
+func (p *OidcProvider) AllowRegister() bool { return p.cfg.AllowRegister }
 
 func (p *OidcProvider) AuthURL(state, nonce, pkceVerifier string) string {
 	return p.oauth2.AuthCodeURL(
@@ -57,24 +56,24 @@ func (p *OidcProvider) AuthURL(state, nonce, pkceVerifier string) string {
 	)
 }
 
-func (p *OidcProvider) Exchange(ctx context.Context, code, pkceVerifier, expectedNonce string) (models.Identity, error) {
+func (p *OidcProvider) Exchange(ctx context.Context, code, pkceVerifier, expectedNonce string) (subject, email string, emailVerified bool, err error) {
 	token, err := p.oauth2.Exchange(ctx, code, oauth2.VerifierOption(pkceVerifier))
 	if err != nil {
-		return models.Identity{}, fmt.Errorf("token exchange: %w", err)
+		return "", "", false, fmt.Errorf("token exchange: %w", err)
 	}
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok {
-		return models.Identity{}, fmt.Errorf("no id_token in token response")
+		return "", "", false, fmt.Errorf("no id_token in token response")
 	}
 	idToken, err := p.verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		return models.Identity{}, fmt.Errorf("id_token verify: %w", err)
+		return "", "", false, fmt.Errorf("id_token verify: %w", err)
 	}
 	if idToken.Nonce != expectedNonce {
-		return models.Identity{}, fmt.Errorf("nonce mismatch")
+		return "", "", false, fmt.Errorf("nonce mismatch")
 	}
 	if idToken.Subject == "" {
-		return models.Identity{}, fmt.Errorf("id_token missing subject")
+		return "", "", false, fmt.Errorf("id_token missing subject")
 	}
 	var claims struct {
 		Email             string `json:"email"`
@@ -83,12 +82,7 @@ func (p *OidcProvider) Exchange(ctx context.Context, code, pkceVerifier, expecte
 		PreferredUsername string `json:"preferred_username"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
-		return models.Identity{}, fmt.Errorf("parse claims: %w", err)
+		return "", "", false, fmt.Errorf("parse claims: %w", err)
 	}
-	return models.Identity{
-		Subject:       idToken.Subject,
-		Email:         claims.Email,
-		Provider:      p.name,
-		EmailVerified: claims.EmailVerified,
-	}, nil
+	return idToken.Subject, claims.Email, claims.EmailVerified, nil
 }

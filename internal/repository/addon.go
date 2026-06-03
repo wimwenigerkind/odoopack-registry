@@ -24,7 +24,7 @@ func (r *AddonRepository) Create(addon *models.Addon) error {
 
 func (r *AddonRepository) GetByID(id uuid.UUID) (*models.Addon, error) {
 	var addon models.Addon
-	err := r.db.Preload("Versions").Where("id = ?", id).First(&addon).Error
+	err := r.db.Preload("Versions").Preload("Owner").Where("id = ?", id).First(&addon).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
 	}
@@ -36,7 +36,7 @@ func (r *AddonRepository) GetByID(id uuid.UUID) (*models.Addon, error) {
 
 func (r *AddonRepository) GetByName(name string) (*models.Addon, error) {
 	var addon models.Addon
-	err := r.db.Preload("Versions").Where("name = ?", name).First(&addon).Error
+	err := r.db.Preload("Versions").Preload("Owner").Where("name = ?", name).First(&addon).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
 	}
@@ -48,7 +48,7 @@ func (r *AddonRepository) GetByName(name string) (*models.Addon, error) {
 
 func (r *AddonRepository) ListVisibleTo(userID *uuid.UUID, nameFilter string) ([]models.Addon, error) {
 	var addons []models.Addon
-	q := r.db.Preload("Versions")
+	q := r.db.Preload("Versions").Preload("Owner")
 	if nameFilter != "" {
 		q = q.Where("name = ?", nameFilter)
 	}
