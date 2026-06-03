@@ -105,6 +105,7 @@ func buildStorage() (storage.Storage, error) {
 func registerRoutes(r *gin.Engine, addons *handler.AddonHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, requireAuth gin.HandlerFunc) {
 	api := r.Group("/api/v1", requireAuth)
 	{
+		api.GET("/me", authH.Me)
 		api.GET("/addons", addons.List)
 		api.POST("/addons", addons.Register)
 		api.GET("/addons/:id", addons.Get)

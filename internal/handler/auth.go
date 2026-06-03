@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
+	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 )
@@ -191,6 +192,24 @@ func (h *AuthHandler) findOrCreateUser(provider auth.Provider, identity models.I
 		return nil, err
 	}
 	return newUser, nil
+}
+
+func (h *AuthHandler) Me(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+	user, err := h.users.GetByID(userID)
+	if errors.Is(err, repository.ErrNotFound) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+	if err != nil {
+		internalError(c, "get user", err)
+		return
+	}
+	c.JSON(http.StatusOK, user)
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
