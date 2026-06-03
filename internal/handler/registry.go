@@ -42,7 +42,12 @@ func (h *RegistryHandler) Get(c *gin.Context) {
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+
+	if addon.Visibility != models.VisibilityPublic {
+		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
 		return
 	}
 

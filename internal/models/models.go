@@ -43,6 +43,7 @@ type Addon struct {
 	DefaultBranch string         `gorm:"default:main" json:"default_branch"`
 	Visibility    Visibility     `gorm:"not null;default:public" json:"visibility"`
 	WebhookSecret string         `gorm:"not null" json:"-"`
+	OwnerID       uuid.UUID      `gorm:"type:uuid;not null;index" json:"owner_id"`
 	Versions      []AddonVersion `json:"versions,omitempty"`
 }
 

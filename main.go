@@ -77,7 +77,8 @@ func main() {
 		log.Fatalf("trusted proxies: %v", err)
 	}
 	requireAuth := middleware.RequireAuth(sessionStore)
-	registerRoutes(r, addonHandler, downloadHandler, triggerHandler, registryHandler, authHandler, requireAuth)
+	optionalAuth := middleware.OptionalAuth(sessionStore)
+	registerRoutes(r, addonHandler, downloadHandler, triggerHandler, registryHandler, authHandler, requireAuth, optionalAuth)
 
 	if viper.GetString("storage.driver") == "local" {
 		r.Static("/zipball", viper.GetString("storage.local.root"))
@@ -102,15 +103,15 @@ func buildStorage() (storage.Storage, error) {
 	}
 }
 
-func registerRoutes(r *gin.Engine, addons *handler.AddonHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, requireAuth gin.HandlerFunc) {
-	api := r.Group("/api/v1", requireAuth)
+func registerRoutes(r *gin.Engine, addons *handler.AddonHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, requireAuth, optionalAuth gin.HandlerFunc) {
+	api := r.Group("/api/v1")
 	{
-		api.GET("/me", authH.Me)
-		api.GET("/addons", addons.List)
-		api.POST("/addons", addons.Register)
-		api.GET("/addons/:id", addons.Get)
-		api.GET("/addons/:id/versions/:version/download", downloads.Zipball)
-		api.POST("/addons/:id/sync", triggers.Sync)
+		api.GET("/me", requireAuth, authH.Me)
+		api.GET("/addons", optionalAuth, addons.List)
+		api.POST("/addons", requireAuth, addons.Register)
+		api.GET("/addons/:id", optionalAuth, addons.Get)
+		api.GET("/addons/:id/versions/:version/download", optionalAuth, downloads.Zipball)
+		api.POST("/addons/:id/sync", requireAuth, triggers.Sync)
 	}
 
 	reg := r.Group("/registry/v1")

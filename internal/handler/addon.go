@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 )
@@ -40,22 +41,32 @@ func (h *AddonHandler) Get(c *gin.Context) {
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+	if !canReadAddon(c, addon) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
 		return
 	}
 	c.JSON(http.StatusOK, addon)
 }
 
 func (h *AddonHandler) List(c *gin.Context) {
-	addons, err := h.addons.List(c.Query("name"))
+	addons, err := h.addons.ListVisibleTo(currentUserIDPtr(c), c.Query("name"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(http.StatusOK, addons)
 }
 
 func (h *AddonHandler) Register(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
 	var req registerAddonRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -64,7 +75,7 @@ func (h *AddonHandler) Register(c *gin.Context) {
 
 	secret, err := generateSecret(32)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
@@ -88,10 +99,11 @@ func (h *AddonHandler) Register(c *gin.Context) {
 		DefaultBranch: defaultBranch,
 		Visibility:    visibility,
 		WebhookSecret: secret,
+		OwnerID:       userID,
 	}
 
 	if err := h.addons.Create(addon); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 

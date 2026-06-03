@@ -46,11 +46,16 @@ func (r *AddonRepository) GetByName(name string) (*models.Addon, error) {
 	return &addon, nil
 }
 
-func (r *AddonRepository) List(nameFilter string) ([]models.Addon, error) {
+func (r *AddonRepository) ListVisibleTo(userID *uuid.UUID, nameFilter string) ([]models.Addon, error) {
 	var addons []models.Addon
 	q := r.db.Preload("Versions")
 	if nameFilter != "" {
 		q = q.Where("name = ?", nameFilter)
+	}
+	if userID == nil {
+		q = q.Where("visibility = ?", models.VisibilityPublic)
+	} else {
+		q = q.Where("visibility = ? OR owner_id = ?", models.VisibilityPublic, *userID)
 	}
 	err := q.Find(&addons).Error
 	return addons, err
