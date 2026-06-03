@@ -15,7 +15,7 @@ func LoadConfig() {
 	viper.SetDefault("server_address", "0.0.0.0:6969")
 	viper.SetDefault("base_url", "http://localhost:6969")
 
-	viper.SetDefault("cors.allowed_origins", "http://localhost:5173")
+	viper.SetDefault("cors.allowed_origins", []string{})
 
 	viper.SetDefault("db.host", "localhost")
 	viper.SetDefault("db.port", "5432")

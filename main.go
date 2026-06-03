@@ -63,13 +63,15 @@ func main() {
 
 	r := gin.Default()
 
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     viper.GetStringSlice("cors.allowed_origins"),
-		AllowMethods:     []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Authorization", "Content-Type"},
-		AllowCredentials: false,
-		MaxAge:           12 * time.Hour,
-	}))
+	if origins := viper.GetStringSlice("cors.allowed_origins"); len(origins) > 0 {
+		r.Use(cors.New(cors.Config{
+			AllowOrigins:     origins,
+			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowHeaders:     []string{"Authorization", "Content-Type"},
+			AllowCredentials: true,
+			MaxAge:           12 * time.Hour,
+		}))
+	}
 
 	if err := r.SetTrustedProxies(nil); err != nil {
 		log.Fatalf("trusted proxies: %v", err)
