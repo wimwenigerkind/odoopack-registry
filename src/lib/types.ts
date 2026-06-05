@@ -4,7 +4,27 @@ export interface User {
   updated_at: string
   username: string
   email: string
+  is_admin: boolean
   identities?: Identity[]
+}
+
+export interface Group {
+  id: string
+  created_at: string
+  updated_at: string
+  name: string
+}
+
+export interface GroupMembership {
+  group_id: string
+  user_id: string
+  created_at: string
+}
+
+export interface GroupAddonAccess {
+  group_id: string
+  addon_id: string
+  created_at: string
 }
 
 export interface Identity {
