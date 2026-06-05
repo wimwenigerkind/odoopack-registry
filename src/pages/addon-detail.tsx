@@ -30,7 +30,7 @@ export default function AddonDetailPage() {
         <dt>Owner</dt>
         <dd style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {addon.owner?.email && <Avatar email={addon.owner.email} size={24} />}
-          {addon.owner?.username ?? "—"}
+          {addon.owner?.username ?? "-"}
         </dd>
         <dt>Visibility</dt>
         <dd>{addon.visibility}</dd>
@@ -83,7 +83,7 @@ export default function AddonDetailPage() {
                 </td>
                 <td>{formatSize(v.size_bytes)}</td>
                 <td>
-                  {v.built_at ? new Date(v.built_at).toLocaleString() : "—"}
+                  {v.built_at ? new Date(v.built_at).toLocaleString() : "-"}
                 </td>
                 <td>
                   {v.status === "ready" ? (
@@ -93,7 +93,7 @@ export default function AddonDetailPage() {
                       Download
                     </a>
                   ) : (
-                    "—"
+                    "-"
                   )}
                 </td>
               </tr>
@@ -110,7 +110,7 @@ function StatusBadge({ status }: { status: VersionStatus }) {
 }
 
 function formatSize(bytes?: number): string {
-  if (!bytes) return "—"
+  if (!bytes) return "-"
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
