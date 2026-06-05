@@ -6,6 +6,7 @@ type User struct {
 	Base
 	Username   string     `json:"username"`
 	Email      string     `gorm:"index" json:"email"`
+	IsAdmin    bool       `gorm:"not null;default:false" json:"is_admin"`
 	Identities []Identity `json:"identities,omitempty"`
 }
 
