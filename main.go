@@ -38,6 +38,7 @@ func main() {
 	addonRepo := repository.NewAddonRepository(db)
 	versionRepo := repository.NewAddonVersionRepository(db)
 	userRepo := repository.NewUserRepository(db)
+	groupRepo := repository.NewGroupRepository(db)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -55,11 +56,13 @@ func main() {
 	sessionStore := auth.NewSessionStore()
 	defer sessionStore.Stop()
 
-	addonHandler := handler.NewAddonHandler(addonRepo)
-	downloadHandler := handler.NewDownloadHandler(addonRepo, versionRepo, store)
-	triggerHandler := handler.NewTriggerHandler(addonRepo, queue)
+	addonHandler := handler.NewAddonHandler(addonRepo, groupRepo, userRepo)
+	downloadHandler := handler.NewDownloadHandler(addonRepo, versionRepo, groupRepo, userRepo, store)
+	triggerHandler := handler.NewTriggerHandler(addonRepo, userRepo, queue)
 	registryHandler := handler.NewRegistryHandler(addonRepo, store)
 	authHandler := handler.NewAuthHandler(authRegistry, stateStore, sessionStore, userRepo, viper.GetBool("auth.cookie_secure"))
+	groupHandler := handler.NewGroupHandler(groupRepo)
+	userHandler := handler.NewUserHandler(userRepo)
 
 	r := gin.Default()
 
@@ -77,8 +80,10 @@ func main() {
 		log.Fatalf("trusted proxies: %v", err)
 	}
 	requireAuth := middleware.RequireAuth(sessionStore)
+	requireAdmin := middleware.RequireAdmin(sessionStore, userRepo)
 	optionalAuth := middleware.OptionalAuth(sessionStore)
-	registerRoutes(r, addonHandler, downloadHandler, triggerHandler, registryHandler, authHandler, requireAuth, optionalAuth)
+	mode := viper.GetString("instance.mode")
+	registerRoutes(r, mode, addonHandler, downloadHandler, triggerHandler, registryHandler, authHandler, groupHandler, userHandler, requireAuth, requireAdmin, optionalAuth)
 
 	if viper.GetString("storage.driver") == "local" {
 		r.Static("/zipball", viper.GetString("storage.local.root"))
@@ -103,7 +108,7 @@ func buildStorage() (storage.Storage, error) {
 	}
 }
 
-func registerRoutes(r *gin.Engine, addons *handler.AddonHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, requireAuth, optionalAuth gin.HandlerFunc) {
+func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, groups *handler.GroupHandler, users *handler.UserHandler, requireAuth, requireAdmin, optionalAuth gin.HandlerFunc) {
 	api := r.Group("/api/v1")
 	{
 		api.GET("/me", requireAuth, authH.Me)
@@ -112,6 +117,21 @@ func registerRoutes(r *gin.Engine, addons *handler.AddonHandler, downloads *hand
 		api.GET("/addons/:id", optionalAuth, addons.Get)
 		api.GET("/addons/:id/versions/:version/download", optionalAuth, downloads.Zipball)
 		api.POST("/addons/:id/sync", requireAuth, triggers.Sync)
+	}
+
+	if mode == "private" {
+		api.GET("/users", requireAdmin, users.List)
+
+		api.POST("/groups", requireAdmin, groups.Create)
+		api.GET("/groups", requireAdmin, groups.List)
+		api.GET("/groups/:id", requireAdmin, groups.Get)
+		api.DELETE("/groups/:id", requireAdmin, groups.Delete)
+		api.POST("/groups/:id/members", requireAdmin, groups.AddMember)
+		api.DELETE("/groups/:id/members/:user_id", requireAdmin, groups.RemoveMember)
+		api.GET("/groups/:id/members", requireAdmin, groups.ListMembers)
+		api.POST("/groups/:id/addons", requireAdmin, groups.GrantAddon)
+		api.DELETE("/groups/:id/addons/:addon_id", requireAdmin, groups.RevokeAddon)
+		api.GET("/groups/:id/addons", requireAdmin, groups.ListAddons)
 	}
 
 	reg := r.Group("/registry/v1")
