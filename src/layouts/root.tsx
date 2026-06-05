@@ -32,6 +32,13 @@ export default function RootLayout() {
               {" "}{displayName}
             </Link>
           </h2>
+          {user.is_admin && (
+            <nav>
+              <Link to="/admin/users">Users</Link>
+              {" | "}
+              <Link to="/admin/groups">Groups</Link>
+            </nav>
+          )}
           <button
             onClick={() => logout.mutate()}
             disabled={logout.isPending}
