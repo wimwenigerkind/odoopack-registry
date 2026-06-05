@@ -6,12 +6,31 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
+	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 )
 
 const (
 	contextKeyUserID  = "auth.user_id"
 	contextKeySession = "auth.session"
 )
+
+func RequireAdmin(sessions *auth.SessionStore, users *repository.UserRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		sess, ok := loadSession(c, sessions)
+		if !ok || sess.UserID == uuid.Nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			return
+		}
+		user, err := users.GetByID(sess.UserID)
+		if err != nil || user == nil || !user.IsAdmin {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "admin required"})
+			return
+		}
+		c.Set(contextKeyUserID, sess.UserID)
+		c.Set(contextKeySession, sess)
+		c.Next()
+	}
+}
 
 func RequireAuth(sessions *auth.SessionStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
