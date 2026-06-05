@@ -15,10 +15,12 @@ import (
 
 type AddonHandler struct {
 	addons *repository.AddonRepository
+	groups *repository.GroupRepository
+	users  *repository.UserRepository
 }
 
-func NewAddonHandler(addons *repository.AddonRepository) *AddonHandler {
-	return &AddonHandler{addons: addons}
+func NewAddonHandler(addons *repository.AddonRepository, groups *repository.GroupRepository, users *repository.UserRepository) *AddonHandler {
+	return &AddonHandler{addons: addons, groups: groups, users: users}
 }
 
 type registerAddonRequest struct {
@@ -44,7 +46,7 @@ func (h *AddonHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
-	if !canReadAddon(c, addon) {
+	if !canReadAddon(c, addon, h.groups, h.users) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
 		return
 	}
@@ -52,7 +54,7 @@ func (h *AddonHandler) Get(c *gin.Context) {
 }
 
 func (h *AddonHandler) List(c *gin.Context) {
-	addons, err := h.addons.ListVisibleTo(currentUserIDPtr(c), c.Query("name"))
+	addons, err := h.addons.ListVisibleTo(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), c.Query("name"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return

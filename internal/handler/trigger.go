@@ -12,11 +12,12 @@ import (
 
 type TriggerHandler struct {
 	addons *repository.AddonRepository
+	users  *repository.UserRepository
 	queue  *worker.Queue
 }
 
-func NewTriggerHandler(addons *repository.AddonRepository, queue *worker.Queue) *TriggerHandler {
-	return &TriggerHandler{addons: addons, queue: queue}
+func NewTriggerHandler(addons *repository.AddonRepository, users *repository.UserRepository, queue *worker.Queue) *TriggerHandler {
+	return &TriggerHandler{addons: addons, users: users, queue: queue}
 }
 
 func (h *TriggerHandler) Sync(c *gin.Context) {
@@ -35,7 +36,7 @@ func (h *TriggerHandler) Sync(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
-	if !canWriteAddon(c, addon) {
+	if !canWriteAddon(c, addon, h.users) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
 		return
 	}

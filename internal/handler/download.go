@@ -17,11 +17,13 @@ import (
 type DownloadHandler struct {
 	addons   *repository.AddonRepository
 	versions *repository.AddonVersionRepository
+	groups   *repository.GroupRepository
+	users    *repository.UserRepository
 	storage  storage.Storage
 }
 
-func NewDownloadHandler(addons *repository.AddonRepository, versions *repository.AddonVersionRepository, store storage.Storage) *DownloadHandler {
-	return &DownloadHandler{addons: addons, versions: versions, storage: store}
+func NewDownloadHandler(addons *repository.AddonRepository, versions *repository.AddonVersionRepository, groups *repository.GroupRepository, users *repository.UserRepository, store storage.Storage) *DownloadHandler {
+	return &DownloadHandler{addons: addons, versions: versions, groups: groups, users: users, storage: store}
 }
 
 func (h *DownloadHandler) Zipball(c *gin.Context) {
@@ -41,7 +43,7 @@ func (h *DownloadHandler) Zipball(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
-	if !canReadAddon(c, addon) {
+	if !canReadAddon(c, addon, h.groups, h.users) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
 		return
 	}

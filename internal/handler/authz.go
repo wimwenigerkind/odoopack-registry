@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
+	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 )
 
 func currentUserIDPtr(c *gin.Context) *uuid.UUID {
@@ -14,7 +15,19 @@ func currentUserIDPtr(c *gin.Context) *uuid.UUID {
 	return nil
 }
 
-func canReadAddon(c *gin.Context, addon *models.Addon) bool {
+func isCurrentUserAdmin(c *gin.Context, users *repository.UserRepository) bool {
+	uid, ok := middleware.CurrentUserID(c)
+	if !ok {
+		return false
+	}
+	u, err := users.GetByID(uid)
+	if err != nil || u == nil {
+		return false
+	}
+	return u.IsAdmin
+}
+
+func canReadAddon(c *gin.Context, addon *models.Addon, groups *repository.GroupRepository, users *repository.UserRepository) bool {
 	if addon.Visibility == models.VisibilityPublic {
 		return true
 	}
@@ -22,13 +35,26 @@ func canReadAddon(c *gin.Context, addon *models.Addon) bool {
 	if !ok {
 		return false
 	}
-	return addon.OwnerID == uid
+	if isCurrentUserAdmin(c, users) {
+		return true
+	}
+	if addon.OwnerID == uid {
+		return true
+	}
+	can, err := groups.UserCanReadAddon(uid, addon.ID)
+	if err != nil {
+		return false
+	}
+	return can
 }
 
-func canWriteAddon(c *gin.Context, addon *models.Addon) bool {
+func canWriteAddon(c *gin.Context, addon *models.Addon, users *repository.UserRepository) bool {
 	uid, ok := middleware.CurrentUserID(c)
 	if !ok {
 		return false
 	}
-	return addon.OwnerID == uid
+	if addon.OwnerID == uid {
+		return true
+	}
+	return isCurrentUserAdmin(c, users)
 }
