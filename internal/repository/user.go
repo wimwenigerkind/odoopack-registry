@@ -28,6 +28,12 @@ func (r *UserRepository) GetByID(id uuid.UUID) (*models.User, error) {
 	return &user, nil
 }
 
+func (r *UserRepository) List() ([]models.User, error) {
+	var users []models.User
+	err := r.db.Order("email").Find(&users).Error
+	return users, err
+}
+
 func (r *UserRepository) GetByIdentity(provider, subject string) (*models.User, error) {
 	var identity models.Identity
 	err := r.db.Where("provider = ? AND subject = ?", provider, subject).First(&identity).Error
