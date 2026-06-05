@@ -1,4 +1,4 @@
-import {Outlet} from "react-router";
+import {Link, Outlet} from "react-router";
 import {useMe} from "@/hooks/auth/use-me.ts";
 import {useProviders} from "@/hooks/auth/use-providers.ts";
 import {useLogout} from "@/hooks/auth/use-logout.ts";
@@ -26,9 +26,11 @@ export default function RootLayout() {
         <p>Could not check login state. Try reloading.</p>
       ) : user ? (
         <section>
-          <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Avatar email={user.email} size={32} />
-            Logged in as {displayName}
+          <h2>
+            <Link to="/profile">
+              <Avatar email={user.email} size={32} />
+              {" "}{displayName}
+            </Link>
           </h2>
           <button
             onClick={() => logout.mutate()}
