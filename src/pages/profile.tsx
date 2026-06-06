@@ -1,6 +1,12 @@
+import { useState } from "react"
 import { Link } from "react-router"
 import { useMe } from "@/hooks/auth/use-me"
 import { Avatar } from "@/components/avatar"
+import {
+  useCreateToken,
+  useDeleteToken,
+  useTokens,
+} from "@/hooks/tokens/use-tokens"
 
 export default function ProfilePage() {
   const { data: user, isLoading, isError } = useMe()
@@ -48,6 +54,102 @@ export default function ProfilePage() {
             </li>
           ))}
         </ul>
+      )}
+
+      <Tokens />
+    </>
+  )
+}
+
+function Tokens() {
+  const { data: tokens, isLoading, isError } = useTokens()
+  const createToken = useCreateToken()
+  const deleteToken = useDeleteToken()
+  const [name, setName] = useState("")
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    createToken.mutate(
+      { name: name.trim() },
+      {
+        onSuccess: () => {
+          setName("")
+        },
+      },
+    )
+  }
+
+  return (
+    <>
+      <h3>API Tokens</h3>
+      <p>
+        Used by the CLI to access this registry. Send as{" "}
+        <code>Authorization: Bearer &lt;token&gt;</code>.
+      </p>
+
+      <form onSubmit={submit}>
+        <label>
+          Name{" "}
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="my laptop"
+            required
+          />
+        </label>{" "}
+        <button type="submit" disabled={createToken.isPending}>
+          {createToken.isPending ? "Creating..." : "Create token"}
+        </button>
+      </form>
+      {createToken.isError && (
+        <p>Error: {createToken.error.message}</p>
+      )}
+
+      {isLoading && <p>Loading tokens...</p>}
+      {isError && <p>Could not load tokens.</p>}
+      {tokens && tokens.length === 0 && <p>No tokens yet.</p>}
+      {tokens && tokens.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Token</th>
+              <th>Created</th>
+              <th>Last used</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {tokens.map((t) => (
+              <tr key={t.id}>
+                <td>{t.name}</td>
+                <td>
+                  <code>{t.token}</code>
+                </td>
+                <td>{new Date(t.created_at).toLocaleDateString()}</td>
+                <td>
+                  {t.last_used_at
+                    ? new Date(t.last_used_at).toLocaleString()
+                    : "never"}
+                </td>
+                <td>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Revoke token "${t.name}"?`)) {
+                        deleteToken.mutate(t.id)
+                      }
+                    }}
+                    disabled={deleteToken.isPending}
+                  >
+                    Revoke
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </>
   )

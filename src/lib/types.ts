@@ -35,6 +35,20 @@ export interface Identity {
   user_id: string
 }
 
+export interface ApiToken {
+  id: string
+  created_at: string
+  updated_at: string
+  user_id: string
+  name: string
+  token: string
+  last_used_at?: string | null
+}
+
+export interface CreateTokenRequest {
+  name: string
+}
+
 export interface ProviderSummary {
   name: string
   type: string

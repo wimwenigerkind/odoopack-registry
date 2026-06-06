@@ -9,4 +9,6 @@ export const queryKeys = {
   group: (id: string) => ["admin", "groups", id] as const,
   groupMembers: (id: string) => ["admin", "groups", id, "members"] as const,
   groupAddons: (id: string) => ["admin", "groups", id, "addons"] as const,
+
+  tokens: () => ["me", "tokens"] as const,
 }
