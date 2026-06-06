@@ -28,15 +28,28 @@ export default function HomePage() {
             <p>No addons visible.</p>
           )
         ) : (
-          <ul>
-            {addons.map((a) => (
-              <li key={a.id}>
-                <Link to={`/addons/${a.id}`}>{a.name}</Link>{" "}
-                <small>({a.visibility})</small>{" "}
-                <small>{a.versions?.length ?? 0} versions</small>
-              </li>
-            ))}
-          </ul>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Visibility</th>
+                <th>Versions</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {addons.map((a) => (
+                <tr key={a.id}>
+                  <td>
+                    <Link to={`/addons/${a.id}`}>{a.name}</Link>
+                  </td>
+                  <td>{a.visibility}</td>
+                  <td>{a.versions?.length ?? 0}</td>
+                  <td>{new Date(a.updated_at).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </section>
     </>

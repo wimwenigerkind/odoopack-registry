@@ -100,29 +100,43 @@ export default function AdminGroupDetailPage() {
         {(members ?? []).length === 0 ? (
           <p>No members.</p>
         ) : (
-          <ul>
-            {(members ?? []).map((m) => {
-              const u = usersByID.get(m.user_id)
-              return (
-                <li key={m.user_id}>
-                  {u ? (
-                    <>
-                      {u.email}
-                      {u.username && <> ({u.username})</>}
-                    </>
-                  ) : (
-                    <code>{m.user_id}</code>
-                  )}{" "}
-                  <button
-                    onClick={() => removeMember.mutate(m.user_id)}
-                    disabled={removeMember.isPending}
-                  >
-                    Remove
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Joined</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {(members ?? []).map((m) => {
+                const u = usersByID.get(m.user_id)
+                return (
+                  <tr key={m.user_id}>
+                    <td>
+                      {u ? (
+                        <>
+                          {u.email}
+                          {u.username && <> ({u.username})</>}
+                        </>
+                      ) : (
+                        <code>{m.user_id}</code>
+                      )}
+                    </td>
+                    <td>{new Date(m.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <button
+                        onClick={() => removeMember.mutate(m.user_id)}
+                        disabled={removeMember.isPending}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         )}
       </section>
 
@@ -150,26 +164,42 @@ export default function AdminGroupDetailPage() {
         {(addonAccess ?? []).length === 0 ? (
           <p>No addon access granted.</p>
         ) : (
-          <ul>
-            {(addonAccess ?? []).map((a) => {
-              const addon = addonsByID.get(a.addon_id)
-              return (
-                <li key={a.addon_id}>
-                  {addon ? (
-                    <Link to={`/addons/${addon.id}`}>{addon.name}</Link>
-                  ) : (
-                    <code>{a.addon_id}</code>
-                  )}{" "}
-                  <button
-                    onClick={() => revokeAddon.mutate(a.addon_id)}
-                    disabled={revokeAddon.isPending}
-                  >
-                    Revoke
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+          <table>
+            <thead>
+              <tr>
+                <th>Addon</th>
+                <th>Visibility</th>
+                <th>Granted</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {(addonAccess ?? []).map((a) => {
+                const addon = addonsByID.get(a.addon_id)
+                return (
+                  <tr key={a.addon_id}>
+                    <td>
+                      {addon ? (
+                        <Link to={`/addons/${addon.id}`}>{addon.name}</Link>
+                      ) : (
+                        <code>{a.addon_id}</code>
+                      )}
+                    </td>
+                    <td>{addon?.visibility ?? "-"}</td>
+                    <td>{new Date(a.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <button
+                        onClick={() => revokeAddon.mutate(a.addon_id)}
+                        disabled={revokeAddon.isPending}
+                      >
+                        Revoke
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         )}
       </section>
     </>

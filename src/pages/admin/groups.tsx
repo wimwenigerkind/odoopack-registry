@@ -51,23 +51,37 @@ export default function AdminGroupsPage() {
       ) : (groups ?? []).length === 0 ? (
         <p>No groups yet.</p>
       ) : (
-        <ul>
-          {(groups ?? []).map((g) => (
-            <li key={g.id}>
-              <Link to={`/admin/groups/${g.id}`}>{g.name}</Link>{" "}
-              <button
-                onClick={() => {
-                  if (confirm(`Delete group "${g.name}"?`)) {
-                    deleteGroup.mutate(g.id)
-                  }
-                }}
-                disabled={deleteGroup.isPending}
-              >
-                Delete
-              </button>
-            </li>
-          ))}
-        </ul>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {(groups ?? []).map((g) => (
+              <tr key={g.id}>
+                <td>
+                  <Link to={`/admin/groups/${g.id}`}>{g.name}</Link>
+                </td>
+                <td>{new Date(g.created_at).toLocaleDateString()}</td>
+                <td>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Delete group "${g.name}"?`)) {
+                        deleteGroup.mutate(g.id)
+                      }
+                    }}
+                    disabled={deleteGroup.isPending}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </>
   )
