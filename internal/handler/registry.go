@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
@@ -14,11 +15,15 @@ import (
 
 type RegistryHandler struct {
 	addons  *repository.AddonRepository
+	groups  *repository.GroupRepository
+	users   *repository.UserRepository
+	tokens  *repository.ApiTokenRepository
 	storage storage.Storage
+	mode    string
 }
 
-func NewRegistryHandler(addons *repository.AddonRepository, store storage.Storage) *RegistryHandler {
-	return &RegistryHandler{addons: addons, storage: store}
+func NewRegistryHandler(addons *repository.AddonRepository, groups *repository.GroupRepository, users *repository.UserRepository, tokens *repository.ApiTokenRepository, store storage.Storage, mode string) *RegistryHandler {
+	return &RegistryHandler{addons: addons, groups: groups, users: users, tokens: tokens, storage: store, mode: mode}
 }
 
 type registryVersion struct {
@@ -46,7 +51,7 @@ func (h *RegistryHandler) Get(c *gin.Context) {
 		return
 	}
 
-	if addon.Visibility != models.VisibilityPublic {
+	if !h.canRead(c, addon) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
 		return
 	}
@@ -71,4 +76,50 @@ func (h *RegistryHandler) Get(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, registryAddon{Name: addon.Name, Versions: versions})
+}
+
+func (h *RegistryHandler) canRead(c *gin.Context, addon *models.Addon) bool {
+	if addon.Visibility == models.VisibilityPublic && h.mode != "private" {
+		return true
+	}
+	tok, ok := h.resolveBearer(c)
+	if !ok {
+		return false
+	}
+	user, err := h.users.GetByID(tok.UserID)
+	if err != nil || user == nil {
+		return false
+	}
+	if addon.Visibility == models.VisibilityPublic {
+		return true
+	}
+	if user.IsAdmin {
+		return true
+	}
+	if addon.OwnerID == tok.UserID {
+		return true
+	}
+	can, err := h.groups.UserCanReadAddon(tok.UserID, addon.ID)
+	if err != nil {
+		return false
+	}
+	return can
+}
+
+func (h *RegistryHandler) resolveBearer(c *gin.Context) (*models.ApiToken, bool) {
+	header := c.GetHeader("Authorization")
+	const prefix = "Bearer "
+	if !strings.HasPrefix(header, prefix) {
+		return nil, false
+	}
+	plain := strings.TrimSpace(header[len(prefix):])
+	if plain == "" {
+		return nil, false
+	}
+	tok, err := h.tokens.GetByToken(plain)
+	if err != nil || tok == nil {
+		return nil, false
+	}
+	_ = h.tokens.TouchLastUsed(tok.ID, time.Now())
+	return tok, true
 }
