@@ -5,30 +5,27 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
 )
 
 func LoadProviders(ctx context.Context, baseURL string) (map[string]Provider, error) {
-	raw := viper.GetStringMap("auth")
-	out := make(map[string]Provider, len(raw))
+	names := collectProviderNames()
+	out := make(map[string]Provider, len(names))
 
-	for name, cfgAny := range raw {
-		cfg, ok := cfgAny.(map[string]any)
-		if !ok {
-			// Non-map entries under `auth.*` are config options
-			// (e.g., cookie_secure), not provider definitions.
-			continue
-		}
-		providerType, _ := cfg["type"].(string)
+	for _, name := range names {
+		providerType := viper.GetString("auth." + name + ".type")
 		if providerType == "" {
 			continue
 		}
 		switch providerType {
 		case string(OIDC):
-			var oc OIDCConfig
-			if err := mapstructure.Decode(cfg, &oc); err != nil {
-				return nil, fmt.Errorf("auth.%s: decode: %w", name, err)
+			oc := OIDCConfig{
+				Type:          providerType,
+				AllowLogin:    viper.GetBool("auth." + name + ".allow_login"),
+				AllowRegister: viper.GetBool("auth." + name + ".allow_register"),
+				IssuerURL:     viper.GetString("auth." + name + ".issuer_url"),
+				ClientID:      viper.GetString("auth." + name + ".client_id"),
+				ClientSecret:  viper.GetString("auth." + name + ".client_secret"),
 			}
 			redirect := strings.TrimRight(baseURL, "/") + "/auth/" + name + "/callback"
 			p, err := NewOIDCProvider(ctx, name, oc, redirect)
@@ -41,4 +38,30 @@ func LoadProviders(ctx context.Context, baseURL string) (map[string]Provider, er
 		}
 	}
 	return out, nil
+}
+
+func collectProviderNames() []string {
+	seen := map[string]bool{}
+	var names []string
+
+	for name, cfgAny := range viper.GetStringMap("auth") {
+		if _, ok := cfgAny.(map[string]any); !ok {
+			continue
+		}
+		if !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+
+	for _, name := range strings.Split(viper.GetString("auth.providers"), ",") {
+		name = strings.TrimSpace(name)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		names = append(names, name)
+	}
+
+	return names
 }
