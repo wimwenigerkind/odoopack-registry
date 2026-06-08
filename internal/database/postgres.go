@@ -4,23 +4,13 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func Connect() (*gorm.DB, error) {
-	dsn := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s",
-		viper.GetString("db.host"),
-		viper.GetString("db.user"),
-		viper.GetString("db.password"),
-		viper.GetString("db.name"),
-		viper.GetString("db.port"),
-	)
-
-	db, err := gorm.Open(postgres.Open(dsn))
+func Connect(dsn string) (*gorm.DB, error) {
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}

@@ -22,7 +22,7 @@ import (
 func main() {
 	config.LoadConfig()
 
-	db, err := database.Connect()
+	db, err := database.Connect(viper.GetString("database.dsn"))
 	if err != nil {
 		log.Fatalf("database connect: %v", err)
 	}

@@ -18,11 +18,7 @@ func LoadConfig() {
 
 	viper.SetDefault("cors.allowed_origins", []string{})
 
-	viper.SetDefault("db.host", "localhost")
-	viper.SetDefault("db.port", "5432")
-	viper.SetDefault("db.user", "postgres")
-	viper.SetDefault("db.password", "postgres")
-	viper.SetDefault("db.name", "odoopack-registry")
+	viper.SetDefault("database.dsn", "host=postgres port=5432 user=odoopack password=odoopack dbname=odoopack sslmode=disable")
 
 	viper.SetDefault("storage.driver", "local")
 	viper.SetDefault("storage.local.root", "./data/storage")
