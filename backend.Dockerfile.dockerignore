@@ -1,0 +1,25 @@
+.env
+.env.example
+.git
+.gitignore
+.idea
+.DS_Store
+*.log
+config.yaml
+
+# frontend
+src/
+public/
+node_modules
+dist
+bun.lock
+package.json
+package-lock.json
+yarn.lock
+index.html
+vite.config.ts
+tsconfig*.json
+eslint.config.js
+components.json
+frontend.Dockerfile
+nginx.conf
