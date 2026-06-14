@@ -117,6 +117,7 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, do
 		api.GET("/addons", optionalAuth, addons.List)
 		api.POST("/addons", requireAuth, addons.Register)
 		api.GET("/addons/:id", optionalAuth, addons.Get)
+		api.PUT("/addons/:id", requireAuth, addons.Update)
 		api.GET("/addons/:id/versions/:version/download", optionalAuth, downloads.Zipball)
 		api.POST("/addons/:id/sync", requireAuth, triggers.Sync)
 

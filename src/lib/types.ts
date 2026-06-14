@@ -118,6 +118,13 @@ export interface RegisterAddonRequest {
   integration_id?: string
 }
 
+export interface UpdateAddonRequest {
+  git_url: string
+  default_branch?: string
+  visibility?: Visibility
+  integration_id?: string | null
+}
+
 export interface RegisterAddonResponse {
   addon: Addon
   webhook_secret: string

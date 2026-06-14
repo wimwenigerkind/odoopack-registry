@@ -125,6 +125,72 @@ func (h *AddonHandler) Register(c *gin.Context) {
 	})
 }
 
+type updateAddonRequest struct {
+	GitURL        string            `json:"git_url" binding:"required"`
+	DefaultBranch string            `json:"default_branch"`
+	Visibility    models.Visibility `json:"visibility"`
+	IntegrationID *uuid.UUID        `json:"integration_id"`
+}
+
+func (h *AddonHandler) Update(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	addon, err := h.addons.GetByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+	if !canWriteAddon(c, addon, h.users) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
+		return
+	}
+
+	var req updateAddonRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.IntegrationID != nil {
+		it, err := h.integrations.GetByID(*req.IntegrationID)
+		if err != nil || it == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "integration not found"})
+			return
+		}
+		if it.OwnerID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "integration not owned by user"})
+			return
+		}
+	}
+
+	addon.GitURL = req.GitURL
+	if req.DefaultBranch != "" {
+		addon.DefaultBranch = req.DefaultBranch
+	}
+	if req.Visibility != "" {
+		addon.Visibility = req.Visibility
+	}
+	addon.IntegrationID = req.IntegrationID
+
+	if err := h.addons.Update(addon); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+	c.JSON(http.StatusOK, addon)
+}
+
 func generateSecret(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

@@ -47,6 +47,8 @@ export default function AddonDetailPage() {
           <button onClick={() => sync.mutate()} disabled={sync.isPending}>
             {sync.isPending ? "Syncing…" : "Sync now"}
           </button>
+          {" "}
+          <Link to={`/addons/${addon.id}/edit`}>Edit</Link>
           {sync.isError && <p>Sync failed</p>}
           {sync.isSuccess && <p>Sync queued</p>}
         </section>

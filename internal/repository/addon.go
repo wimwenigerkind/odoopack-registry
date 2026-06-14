@@ -22,6 +22,15 @@ func (r *AddonRepository) Create(addon *models.Addon) error {
 	return r.db.Create(addon).Error
 }
 
+func (r *AddonRepository) Update(addon *models.Addon) error {
+	return r.db.Model(addon).Select("git_url", "default_branch", "visibility", "integration_id").Updates(map[string]any{
+		"git_url":        addon.GitURL,
+		"default_branch": addon.DefaultBranch,
+		"visibility":     addon.Visibility,
+		"integration_id": addon.IntegrationID,
+	}).Error
+}
+
 func (r *AddonRepository) GetByID(id uuid.UUID) (*models.Addon, error) {
 	var addon models.Addon
 	err := r.db.Preload("Versions").Preload("Owner").Where("id = ?", id).First(&addon).Error

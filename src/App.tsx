@@ -3,6 +3,7 @@ import HomePage from "@/pages/home.tsx";
 import {createBrowserRouter, RouterProvider} from "react-router";
 import RootLayout from "@/layouts/root.tsx";
 import AddonDetailPage from "@/pages/addon-detail.tsx";
+import AddonEditPage from "@/pages/addon-edit.tsx";
 import AddonNewPage from "@/pages/addon-new.tsx";
 import ProfilePage from "@/pages/profile.tsx";
 import AdminUsersPage from "@/pages/admin/users.tsx";
@@ -18,6 +19,7 @@ const router = createBrowserRouter([
       { path: "/profile", element: <ProfilePage/> },
       { path: "/addons/new", element: <AddonNewPage/> },
       { path: "/addons/:id", element: <AddonDetailPage/> },
+      { path: "/addons/:id/edit", element: <AddonEditPage/> },
     ]
   },
   {
