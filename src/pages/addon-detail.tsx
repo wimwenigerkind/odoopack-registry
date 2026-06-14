@@ -26,6 +26,8 @@ export default function AddonDetailPage() {
 
       <h2>{addon.name}</h2>
 
+      <InstallSnippet name={addon.name} />
+
       <dl>
         <dt>Owner</dt>
         <dd style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -108,6 +110,21 @@ export default function AddonDetailPage() {
         </table>
       )}
     </>
+  )
+}
+
+function InstallSnippet({ name }: { name: string }) {
+  const cmd = `odoopack add ${name}`
+  return (
+    <p>
+      <code>{cmd}</code>{" "}
+      <button
+        type="button"
+        onClick={() => navigator.clipboard?.writeText(cmd)}
+      >
+        Copy
+      </button>
+    </p>
   )
 }
 
