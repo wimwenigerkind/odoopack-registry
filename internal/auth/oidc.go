@@ -43,12 +43,13 @@ func NewOIDCProvider(ctx context.Context, name string, cfg OIDCConfig, redirectU
 	}, nil
 }
 
-func (p *OidcProvider) Name() string        { return p.name }
-func (p *OidcProvider) Type() ProviderType  { return OIDC }
-func (p *OidcProvider) AllowLogin() bool    { return p.cfg.AllowLogin }
-func (p *OidcProvider) AllowRegister() bool { return p.cfg.AllowRegister }
+func (p *OidcProvider) Name() string              { return p.name }
+func (p *OidcProvider) Type() ProviderType        { return OIDC }
+func (p *OidcProvider) AllowLogin() bool          { return p.cfg.AllowLogin }
+func (p *OidcProvider) AllowRegister() bool       { return p.cfg.AllowRegister }
+func (p *OidcProvider) AllowGitIntegration() bool { return false }
 
-func (p *OidcProvider) AuthURL(state, nonce, pkceVerifier string) string {
+func (p *OidcProvider) LoginAuthURL(state, nonce, pkceVerifier string) string {
 	return p.oauth2.AuthCodeURL(
 		state,
 		oidc.Nonce(nonce),
@@ -56,7 +57,7 @@ func (p *OidcProvider) AuthURL(state, nonce, pkceVerifier string) string {
 	)
 }
 
-func (p *OidcProvider) Exchange(ctx context.Context, code, pkceVerifier, expectedNonce string) (subject, email string, emailVerified bool, err error) {
+func (p *OidcProvider) ExchangeLogin(ctx context.Context, code, pkceVerifier, expectedNonce string) (subject, email string, emailVerified bool, err error) {
 	token, err := p.oauth2.Exchange(ctx, code, oauth2.VerifierOption(pkceVerifier))
 	if err != nil {
 		return "", "", false, fmt.Errorf("token exchange: %w", err)

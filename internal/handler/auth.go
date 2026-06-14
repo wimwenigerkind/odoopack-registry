@@ -60,13 +60,9 @@ func internalError(c *gin.Context, op string, err error) {
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	providerName := c.Param("provider")
-	provider, err := h.registry.Get(providerName)
+	provider, err := h.registry.GetLogin(providerName)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "unknown provider"})
-		return
-	}
-	if !provider.AllowLogin() {
-		c.JSON(http.StatusForbidden, gin.H{"error": "login disabled for provider"})
 		return
 	}
 
@@ -85,7 +81,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	h.writeCookie(c, stateCookieName, state, statePathFor(provider.Name()), int(loginTTL.Seconds()))
-	c.Redirect(http.StatusFound, provider.AuthURL(state, nonce, verifier))
+	c.Redirect(http.StatusFound, provider.LoginAuthURL(state, nonce, verifier))
 }
 
 func (h *AuthHandler) Callback(c *gin.Context) {
@@ -126,13 +122,13 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 		return
 	}
 
-	provider, err := h.registry.Get(providerName)
+	provider, err := h.registry.GetLogin(providerName)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "unknown provider"})
 		return
 	}
 
-	subject, email, emailVerified, err := provider.Exchange(c.Request.Context(), code, fs.Verifier, fs.Nonce)
+	subject, email, emailVerified, err := provider.ExchangeLogin(c.Request.Context(), code, fs.Verifier, fs.Nonce)
 	if err != nil {
 		log.Printf("auth callback: exchange %q: %v", providerName, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication failed"})
@@ -195,7 +191,7 @@ func sanitizeReturnTo(p string) string {
 	return p
 }
 
-func (h *AuthHandler) findOrCreateUser(provider auth.Provider, subject, email string, emailVerified bool) (*models.User, error) {
+func (h *AuthHandler) findOrCreateUser(provider auth.LoginProvider, subject, email string, emailVerified bool) (*models.User, error) {
 	user, err := h.users.GetByIdentity(provider.Name(), subject)
 	if err == nil {
 		return user, nil
