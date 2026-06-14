@@ -8,11 +8,20 @@ import (
 
 var ErrStateNotFound = errors.New("oauth state not found or expired")
 
+type FlowKind string
+
+const (
+	FlowLogin       FlowKind = "login"
+	FlowIntegration FlowKind = "integration"
+)
+
 type FlowState struct {
 	Provider string
+	Kind     FlowKind
 	Nonce    string
 	Verifier string
 	ReturnTo string
+	UserID   string
 }
 
 type stateEntry struct {
