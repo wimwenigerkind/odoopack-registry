@@ -47,6 +47,7 @@ func (h *TriggerHandler) Sync(c *gin.Context) {
 		GitURL:        addon.GitURL,
 		DefaultBranch: addon.DefaultBranch,
 		Trigger:       "manual",
+		IntegrationID: addon.IntegrationID,
 	})
 
 	c.JSON(http.StatusAccepted, gin.H{"status": "queued"})

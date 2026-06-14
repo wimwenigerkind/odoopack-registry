@@ -45,20 +45,20 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	queue := worker.NewQueue(versionRepo, store, viper.GetInt("worker.queue_size"))
-	queue.Start(ctx, viper.GetInt("worker.count"))
-
 	authProviders, err := auth.LoadProviders(ctx, viper.GetString("base_url"))
 	if err != nil {
 		log.Fatalf("auth providers: %v", err)
 	}
 	authRegistry := auth.NewRegistry(authProviders)
+
+	queue := worker.NewQueue(versionRepo, integrationRepo, authRegistry, store, viper.GetInt("worker.queue_size"))
+	queue.Start(ctx, viper.GetInt("worker.count"))
 	stateStore := auth.NewStateStore()
 	defer stateStore.Stop()
 	sessionStore := auth.NewSessionStore()
 	defer sessionStore.Stop()
 
-	addonHandler := handler.NewAddonHandler(addonRepo, groupRepo, userRepo)
+	addonHandler := handler.NewAddonHandler(addonRepo, groupRepo, userRepo, integrationRepo)
 	downloadHandler := handler.NewDownloadHandler(addonRepo, versionRepo, groupRepo, userRepo, store)
 	triggerHandler := handler.NewTriggerHandler(addonRepo, userRepo, queue)
 	registryHandler := handler.NewRegistryHandler(addonRepo, groupRepo, userRepo, tokenRepo, store, viper.GetString("instance.mode"))

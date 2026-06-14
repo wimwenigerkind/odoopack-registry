@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
 	"github.com/wimwenigerkind/odoopack-registry/internal/git"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
@@ -22,20 +23,25 @@ type SyncJob struct {
 	GitURL        string
 	DefaultBranch string
 	Trigger       string
+	IntegrationID *uuid.UUID
 }
 
 type Queue struct {
-	jobs        chan SyncJob
-	versionRepo *repository.AddonVersionRepository
-	storage     storage.Storage
-	wg          sync.WaitGroup
+	jobs            chan SyncJob
+	versionRepo     *repository.AddonVersionRepository
+	integrationRepo *repository.IntegrationRepository
+	authRegistry    *auth.Registry
+	storage         storage.Storage
+	wg              sync.WaitGroup
 }
 
-func NewQueue(versionRepo *repository.AddonVersionRepository, store storage.Storage, bufferSize int) *Queue {
+func NewQueue(versionRepo *repository.AddonVersionRepository, integrationRepo *repository.IntegrationRepository, authRegistry *auth.Registry, store storage.Storage, bufferSize int) *Queue {
 	return &Queue{
-		jobs:        make(chan SyncJob, bufferSize),
-		versionRepo: versionRepo,
-		storage:     store,
+		jobs:            make(chan SyncJob, bufferSize),
+		versionRepo:     versionRepo,
+		integrationRepo: integrationRepo,
+		authRegistry:    authRegistry,
+		storage:         store,
 	}
 }
 
@@ -78,7 +84,13 @@ type desiredVersion struct {
 func (q *Queue) process(ctx context.Context, workerID int, job SyncJob) {
 	log.Printf("worker %d: sync %s from %s (trigger=%s)", workerID, job.Name, job.GitURL, job.Trigger)
 
-	refs, err := git.LsRemote(job.GitURL)
+	cloneURL, err := q.resolveCloneURL(ctx, job)
+	if err != nil {
+		log.Printf("worker %d: resolve clone url %s: %v", workerID, job.Name, err)
+		return
+	}
+
+	refs, err := git.LsRemote(cloneURL)
 	if err != nil {
 		log.Printf("worker %d: ls-remote %s: %v", workerID, job.Name, err)
 		return
@@ -91,7 +103,7 @@ func (q *Queue) process(ctx context.Context, workerID int, job SyncJob) {
 	}
 
 	for _, d := range desired {
-		if err := q.buildVersion(ctx, job, d); err != nil {
+		if err := q.buildVersion(ctx, job, cloneURL, d); err != nil {
 			log.Printf("worker %d: build %s@%s: %v", workerID, job.Name, d.Version, err)
 		}
 	}
@@ -110,7 +122,7 @@ func planVersions(refs []git.Ref, defaultBranch string) []desiredVersion {
 	return out
 }
 
-func (q *Queue) buildVersion(ctx context.Context, job SyncJob, d desiredVersion) error {
+func (q *Queue) buildVersion(ctx context.Context, job SyncJob, cloneURL string, d desiredVersion) error {
 	refType := models.RefTypeTag
 	if d.Ref.Type == git.RefBranch {
 		refType = models.RefTypeBranch
@@ -136,7 +148,7 @@ func (q *Queue) buildVersion(ctx context.Context, job SyncJob, d desiredVersion)
 	}
 
 	rootDir := sanitize(job.Name) + "-" + sanitize(d.Version)
-	archive, err := git.CloneAndZip(job.GitURL, d.Ref.Name, rootDir)
+	archive, err := git.CloneAndZip(cloneURL, d.Ref.Name, rootDir)
 	if err != nil {
 		_ = q.versionRepo.UpdateStatus(av.ID, models.StatusFailed, err.Error())
 		return err

@@ -14,21 +14,22 @@ import (
 )
 
 type AddonHandler struct {
-	addons *repository.AddonRepository
-	groups *repository.GroupRepository
-	users  *repository.UserRepository
+	addons       *repository.AddonRepository
+	groups       *repository.GroupRepository
+	users        *repository.UserRepository
+	integrations *repository.IntegrationRepository
 }
 
-func NewAddonHandler(addons *repository.AddonRepository, groups *repository.GroupRepository, users *repository.UserRepository) *AddonHandler {
-	return &AddonHandler{addons: addons, groups: groups, users: users}
+func NewAddonHandler(addons *repository.AddonRepository, groups *repository.GroupRepository, users *repository.UserRepository, integrations *repository.IntegrationRepository) *AddonHandler {
+	return &AddonHandler{addons: addons, groups: groups, users: users, integrations: integrations}
 }
 
 type registerAddonRequest struct {
-	Name          string             `json:"name" binding:"required"`
-	GitProvider   models.GitProvider `json:"git_provider"`
-	GitURL        string             `json:"git_url" binding:"required"`
-	DefaultBranch string             `json:"default_branch"`
-	Visibility    models.Visibility  `json:"visibility"`
+	Name          string            `json:"name" binding:"required"`
+	GitURL        string            `json:"git_url" binding:"required"`
+	DefaultBranch string            `json:"default_branch"`
+	Visibility    models.Visibility `json:"visibility"`
+	IntegrationID *uuid.UUID        `json:"integration_id,omitempty"`
 }
 
 func (h *AddonHandler) Get(c *gin.Context) {
@@ -89,19 +90,27 @@ func (h *AddonHandler) Register(c *gin.Context) {
 	if visibility == "" {
 		visibility = models.VisibilityPublic
 	}
-	provider := req.GitProvider
-	if provider == "" {
-		provider = models.ProviderGeneric
+
+	if req.IntegrationID != nil {
+		it, err := h.integrations.GetByID(*req.IntegrationID)
+		if err != nil || it == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "integration not found"})
+			return
+		}
+		if it.OwnerID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "integration not owned by user"})
+			return
+		}
 	}
 
 	addon := &models.Addon{
 		Name:          req.Name,
-		GitProvider:   provider,
 		GitURL:        req.GitURL,
 		DefaultBranch: defaultBranch,
 		Visibility:    visibility,
 		WebhookSecret: secret,
 		OwnerID:       userID,
+		IntegrationID: req.IntegrationID,
 	}
 
 	if err := h.addons.Create(addon); err != nil {
