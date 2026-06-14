@@ -40,8 +40,6 @@ export default function AddonDetailPage() {
         </dd>
         <dt>Default branch</dt>
         <dd>{addon.default_branch}</dd>
-        <dt>Provider</dt>
-        <dd>{addon.git_provider}</dd>
       </dl>
 
       {isOwner && (

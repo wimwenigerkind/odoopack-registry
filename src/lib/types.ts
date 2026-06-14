@@ -78,7 +78,6 @@ export interface ProvidersResponse {
   providers: ProviderSummary[]
 }
 
-export type GitProvider = "generic"
 export type Visibility = "public" | "private"
 export type RefType = "tag" | "branch"
 export type VersionStatus = "pending" | "building" | "ready" | "failed"
@@ -102,21 +101,21 @@ export interface Addon {
   created_at: string
   updated_at: string
   name: string
-  git_provider: GitProvider
   git_url: string
   default_branch: string
   visibility: Visibility
   owner_id: string
   owner?: User
+  integration_id?: string | null
   versions?: AddonVersion[]
 }
 
 export interface RegisterAddonRequest {
   name: string
   git_url: string
-  git_provider?: GitProvider
   default_branch?: string
   visibility?: Visibility
+  integration_id?: string
 }
 
 export interface RegisterAddonResponse {

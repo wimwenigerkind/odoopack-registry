@@ -2,16 +2,19 @@ import { type FormEvent, useState } from "react"
 import { Link } from "react-router"
 import { useRegisterAddon } from "@/hooks/addons/use-register-addon"
 import { useMe } from "@/hooks/auth/use-me"
+import { useIntegrations } from "@/hooks/integrations/use-integrations"
 import type { Visibility } from "@/lib/types"
 
 export default function AddonNewPage() {
   const { data: user, isLoading: meLoading } = useMe()
+  const { data: integrations } = useIntegrations()
   const register = useRegisterAddon()
 
   const [name, setName] = useState("")
   const [gitUrl, setGitUrl] = useState("")
   const [defaultBranch, setDefaultBranch] = useState("main")
   const [visibility, setVisibility] = useState<Visibility>("public")
+  const [integrationID, setIntegrationID] = useState("")
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -20,6 +23,7 @@ export default function AddonNewPage() {
       git_url: gitUrl,
       default_branch: defaultBranch,
       visibility,
+      integration_id: integrationID || undefined,
     })
   }
 
@@ -118,6 +122,25 @@ export default function AddonNewPage() {
             >
               <option value="public">Public</option>
               <option value="private">Private</option>
+            </select>
+          </label>
+        </p>
+
+        <p>
+          <label>
+            Integration
+            <br />
+            <select
+              value={integrationID}
+              onChange={(e) => setIntegrationID(e.target.value)}
+            >
+              <option value="">None (anonymous clone)</option>
+              {(integrations ?? []).map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.provider}
+                  {i.account_name ? ` (${i.account_name})` : ""}
+                </option>
+              ))}
             </select>
           </label>
         </p>
