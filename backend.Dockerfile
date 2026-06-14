@@ -10,9 +10,10 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o app
 
-FROM scratch
+FROM alpine:3.24
 
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+RUN apk add --no-cache git ca-certificates
+
 COPY --from=build /app/app /app
 
 ENTRYPOINT ["/app"]
