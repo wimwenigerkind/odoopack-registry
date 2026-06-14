@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -82,29 +82,30 @@ type desiredVersion struct {
 }
 
 func (q *Queue) process(ctx context.Context, workerID int, job SyncJob) {
-	log.Printf("worker %d: sync %s from %s (trigger=%s)", workerID, job.Name, job.GitURL, job.Trigger)
+	log := slog.With("worker", workerID, "addon", job.Name)
+	log.Info("sync", "git_url", job.GitURL, "trigger", job.Trigger)
 
 	cloneURL, err := q.resolveCloneURL(ctx, job)
 	if err != nil {
-		log.Printf("worker %d: resolve clone url %s: %v", workerID, job.Name, err)
+		log.Error("resolve clone url", "err", err)
 		return
 	}
 
 	refs, err := git.LsRemote(cloneURL)
 	if err != nil {
-		log.Printf("worker %d: ls-remote %s: %v", workerID, job.Name, err)
+		log.Error("ls-remote", "err", err)
 		return
 	}
 
 	desired := planVersions(refs, job.DefaultBranch)
 	if len(desired) == 0 {
-		log.Printf("worker %d: %s has no buildable refs", workerID, job.Name)
+		log.Info("no buildable refs")
 		return
 	}
 
 	for _, d := range desired {
 		if err := q.buildVersion(ctx, job, cloneURL, d); err != nil {
-			log.Printf("worker %d: build %s@%s: %v", workerID, job.Name, d.Version, err)
+			log.Error("build", "version", d.Version, "err", err)
 		}
 	}
 }
@@ -138,7 +139,7 @@ func (q *Queue) buildVersion(ctx context.Context, job SyncJob, cloneURL string, 
 			rc.Close()
 			return nil
 		}
-		log.Printf("worker: %s@%s storage_key %s missing, rebuilding", job.Name, d.Version, existing.StorageKey)
+		slog.Warn("storage object missing, rebuilding", "addon", job.Name, "version", d.Version, "storage_key", existing.StorageKey)
 	}
 
 	av := &models.AddonVersion{
@@ -176,7 +177,7 @@ func (q *Queue) buildVersion(ctx context.Context, job SyncJob, cloneURL string, 
 	if err := q.versionRepo.SetReady(av.ID, key, "sha256:"+archive.ContentHash, archive.SizeBytes); err != nil {
 		return fmt.Errorf("mark ready: %w", err)
 	}
-	log.Printf("worker: built %s@%s (%d bytes)", job.Name, d.Version, archive.SizeBytes)
+	slog.Info("built", "addon", job.Name, "version", d.Version, "bytes", archive.SizeBytes)
 	return nil
 }
 

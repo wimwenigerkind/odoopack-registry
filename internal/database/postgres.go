@@ -2,7 +2,7 @@ package database
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"gorm.io/driver/postgres"
@@ -37,6 +37,6 @@ func Migrate(db *gorm.DB) error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	log.Println("database migrations completed successfully")
+	slog.Info("database migrations completed")
 	return nil
 }

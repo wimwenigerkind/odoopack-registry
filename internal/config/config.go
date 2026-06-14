@@ -26,6 +26,8 @@ func LoadConfig() {
 	viper.SetDefault("worker.count", 2)
 	viper.SetDefault("worker.queue_size", 64)
 
+	viper.SetDefault("log.level", "info")
+
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 

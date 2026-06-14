@@ -3,7 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -13,26 +14,33 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/config"
 	"github.com/wimwenigerkind/odoopack-registry/internal/database"
 	"github.com/wimwenigerkind/odoopack-registry/internal/handler"
+	"github.com/wimwenigerkind/odoopack-registry/internal/logger"
 	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
 	"github.com/wimwenigerkind/odoopack-registry/internal/worker"
 )
 
+func fatal(msg string, err error) {
+	slog.Error(msg, "err", err)
+	os.Exit(1)
+}
+
 func main() {
 	config.LoadConfig()
+	logger.Setup(viper.GetString("log.level"))
 
 	db, err := database.Connect(viper.GetString("database.dsn"))
 	if err != nil {
-		log.Fatalf("database connect: %v", err)
+		fatal("database connect", err)
 	}
 	if err := database.Migrate(db); err != nil {
-		log.Fatalf("database migrate: %v", err)
+		fatal("database migrate", err)
 	}
 
 	store, err := buildStorage()
 	if err != nil {
-		log.Fatalf("storage: %v", err)
+		fatal("storage", err)
 	}
 
 	addonRepo := repository.NewAddonRepository(db)
@@ -47,7 +55,7 @@ func main() {
 
 	authProviders, err := auth.LoadProviders(ctx, viper.GetString("base_url"))
 	if err != nil {
-		log.Fatalf("auth providers: %v", err)
+		fatal("auth providers", err)
 	}
 	authRegistry := auth.NewRegistry(authProviders)
 
@@ -83,7 +91,7 @@ func main() {
 	}
 
 	if err := r.SetTrustedProxies(nil); err != nil {
-		log.Fatalf("trusted proxies: %v", err)
+		fatal("trusted proxies", err)
 	}
 	requireAuth := middleware.RequireAuth(sessionStore)
 	requireAdmin := middleware.RequireAdmin(sessionStore, userRepo)
@@ -92,9 +100,9 @@ func main() {
 	registerRoutes(r, mode, addonHandler, downloadHandler, triggerHandler, registryHandler, authHandler, groupHandler, userHandler, tokenHandler, integrationHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional)
 
 	addr := viper.GetString("server_address")
-	fmt.Printf("starting on: http://%s\n", addr)
+	slog.Info("starting server", "addr", addr)
 	if err := r.Run(addr); err != nil {
-		log.Fatalf("server: %v", err)
+		fatal("server", err)
 	}
 }
 

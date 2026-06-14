@@ -2,7 +2,7 @@ package handler
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -57,7 +57,7 @@ func (h *AuthHandler) writeCookie(c *gin.Context, name, value, path string, maxA
 }
 
 func internalError(c *gin.Context, op string, err error) {
-	log.Printf("auth %s: %v", op, err)
+	slog.Error("auth", "op", op, "err", err)
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 }
 
@@ -104,7 +104,7 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	h.writeCookie(c, stateCookieName, "", statePath, -1)
 
 	if errParam := c.Query("error"); errParam != "" {
-		log.Printf("auth callback: provider %q returned error: %s (%s)", providerName, errParam, c.Query("error_description"))
+		slog.Warn("auth callback: provider error", "provider", providerName, "error", errParam, "description", c.Query("error_description"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "authentication failed at provider"})
 		return
 	}
@@ -138,7 +138,7 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 
 	subject, email, emailVerified, err := provider.ExchangeLogin(c.Request.Context(), code, fs.Verifier, fs.Nonce)
 	if err != nil {
-		log.Printf("auth callback: exchange %q: %v", providerName, err)
+		slog.Warn("auth callback: exchange failed", "provider", providerName, "err", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication failed"})
 		return
 	}
@@ -245,7 +245,7 @@ func (h *AuthHandler) completeIntegration(c *gin.Context, providerName, code str
 
 	accessToken, refreshToken, expiresAt, err := provider.ExchangeIntegration(c.Request.Context(), code)
 	if err != nil {
-		log.Printf("integration callback: exchange %q: %v", providerName, err)
+		slog.Warn("integration callback: exchange failed", "provider", providerName, "err", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "integration authorization failed"})
 		return
 	}
