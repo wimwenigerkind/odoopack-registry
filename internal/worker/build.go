@@ -133,7 +133,12 @@ func (q *Queue) buildVersion(ctx context.Context, job SyncJob, cloneURL string, 
 		return fmt.Errorf("lookup existing: %w", err)
 	}
 	if existing != nil && existing.Status == models.StatusReady && existing.RefValue == d.Ref.SHA {
-		return nil
+		rc, err := q.storage.Get(ctx, existing.StorageKey)
+		if err == nil {
+			rc.Close()
+			return nil
+		}
+		log.Printf("worker: %s@%s storage_key %s missing, rebuilding", job.Name, d.Version, existing.StorageKey)
 	}
 
 	av := &models.AddonVersion{
