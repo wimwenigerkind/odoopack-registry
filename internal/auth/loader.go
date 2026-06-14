@@ -42,6 +42,19 @@ func LoadProviders(ctx context.Context, baseURL string) (map[string]Provider, er
 				ClientSecret:        viper.GetString("auth." + name + ".client_secret"),
 			}
 			out[name] = NewGitHubProvider(name, gc, callback)
+		case string(ProviderTypeEntra):
+			ec := EntraConfig{
+				AllowLogin:    viper.GetBool("auth." + name + ".allow_login"),
+				AllowRegister: viper.GetBool("auth." + name + ".allow_register"),
+				TenantID:      viper.GetString("auth." + name + ".tenant_id"),
+				ClientID:      viper.GetString("auth." + name + ".client_id"),
+				ClientSecret:  viper.GetString("auth." + name + ".client_secret"),
+			}
+			p, err := NewEntraProvider(ctx, name, ec, callback)
+			if err != nil {
+				return nil, fmt.Errorf("auth.%s: %w", name, err)
+			}
+			out[name] = p
 		default:
 			return nil, fmt.Errorf("auth.%s: unknown type %q", name, providerType)
 		}
