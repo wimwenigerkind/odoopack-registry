@@ -101,10 +101,7 @@ func main() {
 func buildStorage() (storage.Storage, error) {
 	switch viper.GetString("storage.driver") {
 	case "local":
-		return storage.NewLocalStorage(
-			viper.GetString("storage.local.root"),
-			viper.GetString("storage.local.public_url"),
-		)
+		return storage.NewLocalStorage(viper.GetString("storage.local.root"))
 	default:
 		return nil, fmt.Errorf("unsupported storage driver %q", viper.GetString("storage.driver"))
 	}

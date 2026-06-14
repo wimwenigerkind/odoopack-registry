@@ -5,18 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 type LocalStorage struct {
-	root      string
-	publicURL string
+	root string
 }
 
-func NewLocalStorage(root, publicURL string) (*LocalStorage, error) {
+func NewLocalStorage(root string) (*LocalStorage, error) {
 	abs, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
@@ -24,10 +22,7 @@ func NewLocalStorage(root, publicURL string) (*LocalStorage, error) {
 	if err := os.MkdirAll(abs, 0755); err != nil {
 		return nil, err
 	}
-	return &LocalStorage{
-		root:      abs,
-		publicURL: strings.TrimRight(publicURL, "/"),
-	}, nil
+	return &LocalStorage{root: abs}, nil
 }
 
 func (s *LocalStorage) resolve(key string) (string, error) {
@@ -80,15 +75,4 @@ func (s *LocalStorage) Delete(_ context.Context, key string) error {
 		return ErrNotFound
 	}
 	return err
-}
-
-func (s *LocalStorage) URL(_ context.Context, key string, _ URLOptions) (string, error) {
-	if s.publicURL == "" {
-		return "", fmt.Errorf("storage: no public URL configured for local storage")
-	}
-	segments := strings.Split(key, "/")
-	for i, seg := range segments {
-		segments[i] = url.PathEscape(seg)
-	}
-	return s.publicURL + "/" + strings.Join(segments, "/"), nil
 }
