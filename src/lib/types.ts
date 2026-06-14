@@ -107,6 +107,7 @@ export interface Addon {
   owner_id: string
   owner?: User
   integration_id?: string | null
+  integration?: OAuthIntegration | null
   versions?: AddonVersion[]
 }
 

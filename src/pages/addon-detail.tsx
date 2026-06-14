@@ -40,6 +40,12 @@ export default function AddonDetailPage() {
         </dd>
         <dt>Default branch</dt>
         <dd>{addon.default_branch}</dd>
+        <dt>Integration</dt>
+        <dd>
+          {addon.integration
+            ? `${addon.integration.provider}${addon.integration.account_name ? ` (${addon.integration.account_name})` : ""}`
+            : "none (anonymous clone)"}
+        </dd>
       </dl>
 
       {isOwner && (

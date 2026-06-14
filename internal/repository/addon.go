@@ -33,7 +33,7 @@ func (r *AddonRepository) Update(addon *models.Addon) error {
 
 func (r *AddonRepository) GetByID(id uuid.UUID) (*models.Addon, error) {
 	var addon models.Addon
-	err := r.db.Preload("Versions").Preload("Owner").Where("id = ?", id).First(&addon).Error
+	err := r.db.Preload("Versions").Preload("Owner").Preload("Integration").Where("id = ?", id).First(&addon).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
 	}
