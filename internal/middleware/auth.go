@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -53,6 +55,40 @@ func OptionalAuth(sessions *auth.SessionStore) gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+func ApiKeyOptional(tokens *repository.ApiTokenRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if _, exists := c.Get(contextKeyUserID); exists {
+			c.Next()
+			return
+		}
+		if userID, ok := loadBearer(c, tokens); ok {
+			c.Set(contextKeyUserID, userID)
+		}
+		c.Next()
+	}
+}
+
+func loadBearer(c *gin.Context, tokens *repository.ApiTokenRepository) (uuid.UUID, bool) {
+	if tokens == nil {
+		return uuid.Nil, false
+	}
+	header := c.GetHeader("Authorization")
+	const prefix = "Bearer "
+	if !strings.HasPrefix(header, prefix) {
+		return uuid.Nil, false
+	}
+	plain := strings.TrimSpace(header[len(prefix):])
+	if plain == "" {
+		return uuid.Nil, false
+	}
+	tok, err := tokens.GetByToken(plain)
+	if err != nil || tok == nil {
+		return uuid.Nil, false
+	}
+	_ = tokens.TouchLastUsed(tok.ID, time.Now())
+	return tok.UserID, true
 }
 
 func CurrentUserID(c *gin.Context) (uuid.UUID, bool) {

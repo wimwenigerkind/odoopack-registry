@@ -18,10 +18,11 @@ type AddonHandler struct {
 	groups       *repository.GroupRepository
 	users        *repository.UserRepository
 	integrations *repository.IntegrationRepository
+	mode         string
 }
 
-func NewAddonHandler(addons *repository.AddonRepository, groups *repository.GroupRepository, users *repository.UserRepository, integrations *repository.IntegrationRepository) *AddonHandler {
-	return &AddonHandler{addons: addons, groups: groups, users: users, integrations: integrations}
+func NewAddonHandler(addons *repository.AddonRepository, groups *repository.GroupRepository, users *repository.UserRepository, integrations *repository.IntegrationRepository, mode string) *AddonHandler {
+	return &AddonHandler{addons: addons, groups: groups, users: users, integrations: integrations, mode: mode}
 }
 
 type registerAddonRequest struct {
@@ -47,7 +48,7 @@ func (h *AddonHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
-	if !canReadAddon(c, addon, h.groups, h.users) {
+	if !canReadAddon(c, addon, h.groups, h.users, h.mode) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
 		return
 	}

@@ -20,10 +20,11 @@ type DownloadHandler struct {
 	groups   *repository.GroupRepository
 	users    *repository.UserRepository
 	storage  storage.Storage
+	mode     string
 }
 
-func NewDownloadHandler(addons *repository.AddonRepository, versions *repository.AddonVersionRepository, groups *repository.GroupRepository, users *repository.UserRepository, store storage.Storage) *DownloadHandler {
-	return &DownloadHandler{addons: addons, versions: versions, groups: groups, users: users, storage: store}
+func NewDownloadHandler(addons *repository.AddonRepository, versions *repository.AddonVersionRepository, groups *repository.GroupRepository, users *repository.UserRepository, store storage.Storage, mode string) *DownloadHandler {
+	return &DownloadHandler{addons: addons, versions: versions, groups: groups, users: users, storage: store, mode: mode}
 }
 
 func (h *DownloadHandler) Zipball(c *gin.Context) {
@@ -43,7 +44,7 @@ func (h *DownloadHandler) Zipball(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
-	if !canReadAddon(c, addon, h.groups, h.users) {
+	if !canReadAddon(c, addon, h.groups, h.users, h.mode) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
 		return
 	}
@@ -54,10 +55,9 @@ func (h *DownloadHandler) Zipball(c *gin.Context) {
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
-
 	if av.Status != models.StatusReady {
 		c.JSON(http.StatusConflict, gin.H{"error": "version not ready", "status": av.Status})
 		return
@@ -69,7 +69,7 @@ func (h *DownloadHandler) Zipball(c *gin.Context) {
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 	defer rc.Close()

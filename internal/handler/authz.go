@@ -27,13 +27,16 @@ func isCurrentUserAdmin(c *gin.Context, users *repository.UserRepository) bool {
 	return u.IsAdmin
 }
 
-func canReadAddon(c *gin.Context, addon *models.Addon, groups *repository.GroupRepository, users *repository.UserRepository) bool {
-	if addon.Visibility == models.VisibilityPublic {
+func canReadAddon(c *gin.Context, addon *models.Addon, groups *repository.GroupRepository, users *repository.UserRepository, mode string) bool {
+	if addon.Visibility == models.VisibilityPublic && mode != "private" {
 		return true
 	}
 	uid, ok := middleware.CurrentUserID(c)
 	if !ok {
 		return false
+	}
+	if addon.Visibility == models.VisibilityPublic {
+		return true
 	}
 	if isCurrentUserAdmin(c, users) {
 		return true

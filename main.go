@@ -58,10 +58,12 @@ func main() {
 	sessionStore := auth.NewSessionStore()
 	defer sessionStore.Stop()
 
-	addonHandler := handler.NewAddonHandler(addonRepo, groupRepo, userRepo, integrationRepo)
-	downloadHandler := handler.NewDownloadHandler(addonRepo, versionRepo, groupRepo, userRepo, store)
+	mode := viper.GetString("instance.mode")
+	baseURL := viper.GetString("base_url")
+	addonHandler := handler.NewAddonHandler(addonRepo, groupRepo, userRepo, integrationRepo, mode)
+	downloadHandler := handler.NewDownloadHandler(addonRepo, versionRepo, groupRepo, userRepo, store, mode)
 	triggerHandler := handler.NewTriggerHandler(addonRepo, userRepo, queue)
-	registryHandler := handler.NewRegistryHandler(addonRepo, groupRepo, userRepo, tokenRepo, store, viper.GetString("instance.mode"))
+	registryHandler := handler.NewRegistryHandler(addonRepo, versionRepo, groupRepo, userRepo, store, mode, baseURL)
 	authHandler := handler.NewAuthHandler(authRegistry, stateStore, sessionStore, userRepo, integrationRepo, viper.GetBool("auth.cookie_secure"))
 	groupHandler := handler.NewGroupHandler(groupRepo)
 	userHandler := handler.NewUserHandler(userRepo)
@@ -86,12 +88,8 @@ func main() {
 	requireAuth := middleware.RequireAuth(sessionStore)
 	requireAdmin := middleware.RequireAdmin(sessionStore, userRepo)
 	optionalAuth := middleware.OptionalAuth(sessionStore)
-	mode := viper.GetString("instance.mode")
-	registerRoutes(r, mode, addonHandler, downloadHandler, triggerHandler, registryHandler, authHandler, groupHandler, userHandler, tokenHandler, integrationHandler, requireAuth, requireAdmin, optionalAuth)
-
-	if viper.GetString("storage.driver") == "local" {
-		r.Static("/zipball", viper.GetString("storage.local.root"))
-	}
+	apiKeyOptional := middleware.ApiKeyOptional(tokenRepo)
+	registerRoutes(r, mode, addonHandler, downloadHandler, triggerHandler, registryHandler, authHandler, groupHandler, userHandler, tokenHandler, integrationHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional)
 
 	addr := viper.GetString("server_address")
 	fmt.Printf("starting on: http://%s\n", addr)
@@ -112,7 +110,7 @@ func buildStorage() (storage.Storage, error) {
 	}
 }
 
-func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, groups *handler.GroupHandler, users *handler.UserHandler, tokens *handler.TokenHandler, integrations *handler.IntegrationHandler, requireAuth, requireAdmin, optionalAuth gin.HandlerFunc) {
+func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, groups *handler.GroupHandler, users *handler.UserHandler, tokens *handler.TokenHandler, integrations *handler.IntegrationHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional gin.HandlerFunc) {
 	api := r.Group("/api/v1")
 	{
 		api.GET("/me", requireAuth, authH.Me)
@@ -147,7 +145,8 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, do
 
 	reg := r.Group("/registry/v1")
 	{
-		reg.GET("/addons/*name", registry.Get)
+		reg.GET("/addons/*name", apiKeyOptional, registry.Get)
+		reg.GET("/zipball/:addon_id/:version", apiKeyOptional, registry.Zipball)
 	}
 
 	r.GET("/auth/providers", authH.ListProviders)
