@@ -100,6 +100,14 @@ func (p *GitHubProvider) RefreshIntegration(ctx context.Context, refresh string)
 	return token.AccessToken, token.RefreshToken, tokenExpiry(token), nil
 }
 
+func (p *GitHubProvider) FetchAccountName(ctx context.Context, accessToken string) (string, error) {
+	user, err := fetchGitHubUser(ctx, accessToken)
+	if err != nil {
+		return "", err
+	}
+	return user.Login, nil
+}
+
 func (p *GitHubProvider) AuthenticateGitURL(repoURL, accessToken string) string {
 	u, err := url.Parse(repoURL)
 	if err != nil || u.Scheme == "" {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
 	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
@@ -31,15 +32,17 @@ type AuthHandler struct {
 	stateStore   *auth.StateStore
 	sessions     *auth.SessionStore
 	users        *repository.UserRepository
+	integrations *repository.IntegrationRepository
 	cookieSecure bool
 }
 
-func NewAuthHandler(reg *auth.Registry, store *auth.StateStore, sessions *auth.SessionStore, users *repository.UserRepository, cookieSecure bool) *AuthHandler {
+func NewAuthHandler(reg *auth.Registry, store *auth.StateStore, sessions *auth.SessionStore, users *repository.UserRepository, integrations *repository.IntegrationRepository, cookieSecure bool) *AuthHandler {
 	return &AuthHandler{
 		registry:     reg,
 		stateStore:   store,
 		sessions:     sessions,
 		users:        users,
+		integrations: integrations,
 		cookieSecure: cookieSecure,
 	}
 }
@@ -119,6 +122,11 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	}
 	if fs.Provider != providerName {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "provider mismatch"})
+		return
+	}
+
+	if fs.Kind == auth.FlowIntegration {
+		h.completeIntegration(c, providerName, code, fs)
 		return
 	}
 
@@ -221,6 +229,47 @@ func (h *AuthHandler) findOrCreateUser(provider auth.LoginProvider, subject, ema
 		return nil, err
 	}
 	return newUser, nil
+}
+
+func (h *AuthHandler) completeIntegration(c *gin.Context, providerName, code string, fs auth.FlowState) {
+	provider, err := h.registry.GetIntegration(providerName)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "unknown integration provider"})
+		return
+	}
+	userID, err := uuid.Parse(fs.UserID)
+	if err != nil || userID == uuid.Nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user in state"})
+		return
+	}
+
+	accessToken, refreshToken, expiresAt, err := provider.ExchangeIntegration(c.Request.Context(), code)
+	if err != nil {
+		log.Printf("integration callback: exchange %q: %v", providerName, err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "integration authorization failed"})
+		return
+	}
+
+	accountName, _ := provider.FetchAccountName(c.Request.Context(), accessToken)
+
+	it := &models.OAuthIntegration{
+		Provider:     providerName,
+		OwnerID:      userID,
+		AccountName:  accountName,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		ExpiresAt:    expiresAt,
+	}
+	if err := h.integrations.Create(it); err != nil {
+		internalError(c, "save integration", err)
+		return
+	}
+
+	returnTo := fs.ReturnTo
+	if returnTo == "" {
+		returnTo = "/profile"
+	}
+	c.Redirect(http.StatusFound, returnTo)
 }
 
 func (h *AuthHandler) Me(c *gin.Context) {
