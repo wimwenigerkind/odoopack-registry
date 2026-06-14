@@ -49,6 +49,26 @@ export interface CreateTokenRequest {
   name: string
 }
 
+export interface OAuthIntegration {
+  id: string
+  created_at: string
+  updated_at: string
+  provider: string
+  owner_id: string
+  account_name: string
+  expires_at?: string | null
+  scope?: string
+}
+
+export interface IntegrationProviderSummary {
+  name: string
+  type: string
+}
+
+export interface IntegrationProvidersResponse {
+  providers: IntegrationProviderSummary[]
+}
+
 export interface ProviderSummary {
   name: string
   type: string

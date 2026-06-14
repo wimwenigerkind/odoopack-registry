@@ -7,6 +7,12 @@ import {
   useDeleteToken,
   useTokens,
 } from "@/hooks/tokens/use-tokens"
+import {
+  useDeleteIntegration,
+  useIntegrationProviders,
+  useIntegrations,
+} from "@/hooks/integrations/use-integrations"
+import { BACKEND_BASE } from "@/lib/api"
 
 export default function ProfilePage() {
   const { data: user, isLoading, isError } = useMe()
@@ -57,6 +63,95 @@ export default function ProfilePage() {
       )}
 
       <Tokens />
+
+      <Integrations />
+    </>
+  )
+}
+
+function Integrations() {
+  const { data: integrations, isLoading, isError } = useIntegrations()
+  const {
+    data: providersData,
+    isLoading: providersLoading,
+    isError: providersError,
+    error: providersErr,
+  } = useIntegrationProviders()
+  const deleteIntegration = useDeleteIntegration()
+
+  const providers = providersData?.providers ?? []
+
+  const connectHref = (provider: string) =>
+    `${BACKEND_BASE}/integrations/${provider}/connect?return_to=${encodeURIComponent("/profile")}`
+
+  return (
+    <>
+      <h3>Git Integrations</h3>
+      <p>
+        Connect a git provider so the registry can clone your private repos
+        when syncing addons.
+      </p>
+
+      {providersLoading ? (
+        <p>Loading providers...</p>
+      ) : providersError ? (
+        <p>Could not load providers: {providersErr?.message}</p>
+      ) : providers.length === 0 ? (
+        <p>No integration providers configured on this server.</p>
+      ) : (
+        <p>
+          {providers.map((p) => (
+            <a key={p.name} href={connectHref(p.name)}>
+              Connect {p.name}{" "}
+            </a>
+          ))}
+        </p>
+      )}
+
+      {isLoading && <p>Loading integrations...</p>}
+      {isError && <p>Could not load integrations.</p>}
+      {integrations && integrations.length === 0 && (
+        <p>No integrations connected.</p>
+      )}
+      {integrations && integrations.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>Provider</th>
+              <th>Account</th>
+              <th>Connected</th>
+              <th>Expires</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {integrations.map((i) => (
+              <tr key={i.id}>
+                <td>{i.provider}</td>
+                <td>{i.account_name || "-"}</td>
+                <td>{new Date(i.created_at).toLocaleDateString()}</td>
+                <td>
+                  {i.expires_at
+                    ? new Date(i.expires_at).toLocaleDateString()
+                    : "never"}
+                </td>
+                <td>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Disconnect ${i.provider} (${i.account_name})?`)) {
+                        deleteIntegration.mutate(i.id)
+                      }
+                    }}
+                    disabled={deleteIntegration.isPending}
+                  >
+                    Disconnect
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </>
   )
 }
