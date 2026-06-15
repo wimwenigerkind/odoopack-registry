@@ -69,7 +69,14 @@ func (h *WebhookHandler) Bitbucket(c *gin.Context) {
 		return
 	}
 
-	if !verifyBitbucketHMAC(it.HookSecret, body, c.GetHeader("X-Hub-Signature")) {
+	sigHeader := c.GetHeader("X-Hub-Signature")
+	if !verifyBitbucketHMAC(it.HookSecret, body, sigHeader) {
+		slog.Warn("webhook signature mismatch",
+			"integration", it.ID,
+			"secret_present", it.HookSecret != "",
+			"sig_header", sigHeader,
+			"body_len", len(body),
+		)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
 		return
 	}
