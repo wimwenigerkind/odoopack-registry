@@ -13,6 +13,7 @@ type FlowKind string
 const (
 	FlowLogin       FlowKind = "login"
 	FlowIntegration FlowKind = "integration"
+	FlowLink        FlowKind = "link"
 )
 
 type FlowState struct {

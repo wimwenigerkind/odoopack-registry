@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { Link } from "react-router"
 import { useMe } from "@/hooks/auth/use-me"
+import { useProviders } from "@/hooks/auth/use-providers"
+import { useUnlinkIdentity } from "@/hooks/auth/use-unlink-identity"
 import { Avatar } from "@/components/avatar"
 import {
   useCreateToken,
@@ -46,6 +48,21 @@ export default function ProfilePage() {
         <dd>{new Date(user.created_at).toLocaleDateString()}</dd>
       </dl>
 
+      <ConnectedAccounts identities={identities} />
+
+      <LinkAccounts />
+
+      <Tokens />
+
+      <Integrations />
+    </>
+  )
+}
+
+function ConnectedAccounts({ identities }: { identities: { id: string; provider: string; created_at: string }[] }) {
+  const unlink = useUnlinkIdentity()
+  return (
+    <>
       <h3>Connected accounts</h3>
       {identities.length === 0 ? (
         <p>No connected accounts.</p>
@@ -54,17 +71,46 @@ export default function ProfilePage() {
           {identities.map((i) => (
             <li key={i.id}>
               <strong>{i.provider}</strong>{" "}
-              <small>
-                linked {new Date(i.created_at).toLocaleDateString()}
-              </small>
+              <small>linked {new Date(i.created_at).toLocaleDateString()}</small>{" "}
+              <button
+                onClick={() => {
+                  if (confirm(`Unlink ${i.provider} account?`)) {
+                    unlink.mutate(i.id)
+                  }
+                }}
+                disabled={unlink.isPending}
+              >
+                Unlink
+              </button>
             </li>
           ))}
         </ul>
       )}
+      {unlink.isError && <p>Unlink failed: {unlink.error.message}</p>}
+    </>
+  )
+}
 
-      <Tokens />
+function LinkAccounts() {
+  const { data: providersData, isLoading } = useProviders()
+  const providers = providersData?.providers ?? []
 
-      <Integrations />
+  const linkHref = (provider: string) =>
+    `${BACKEND_BASE}/auth/${provider}/link?return_to=${encodeURIComponent("/profile")}`
+
+  if (isLoading) return null
+  if (providers.length === 0) return null
+
+  return (
+    <>
+      <h3>Link another account</h3>
+      <ul>
+        {providers.map((p) => (
+          <li key={p.name}>
+            <a href={linkHref(p.name)}>Link {p.name}</a>
+          </li>
+        ))}
+      </ul>
     </>
   )
 }

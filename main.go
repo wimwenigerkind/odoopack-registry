@@ -160,9 +160,11 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, do
 	a := r.Group("/auth/:provider")
 	{
 		a.GET("/login", authH.Login)
+		a.GET("/link", requireAuth, authH.Link)
 		a.GET("/callback", authH.Callback)
 	}
 	r.POST("/auth/logout", requireAuth, authH.Logout)
+	r.DELETE("/api/v1/me/identities/:id", requireAuth, authH.UnlinkIdentity)
 
 	r.GET("/integrations/providers", requireAuth, integrations.ListProviders)
 	r.GET("/integrations/:provider/connect", requireAuth, integrations.Connect)

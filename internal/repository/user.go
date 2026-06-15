@@ -55,3 +55,28 @@ func (r *UserRepository) CreateWithIdentity(user *models.User, identity *models.
 		return tx.Create(identity).Error
 	})
 }
+
+func (r *UserRepository) AttachIdentity(userID uuid.UUID, identity *models.Identity) error {
+	identity.UserID = userID
+	return r.db.Create(identity).Error
+}
+
+func (r *UserRepository) DeleteIdentity(id, userID uuid.UUID) error {
+	var count int64
+	if err := r.db.Model(&models.Identity{}).Where("user_id = ?", userID).Count(&count).Error; err != nil {
+		return err
+	}
+	if count <= 1 {
+		return ErrLastIdentity
+	}
+	res := r.db.Where("id = ? AND user_id = ?", id, userID).Delete(&models.Identity{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+var ErrLastIdentity = errors.New("repository: cannot remove last identity")

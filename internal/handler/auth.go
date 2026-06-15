@@ -61,6 +61,39 @@ func internalError(c *gin.Context, op string, err error) {
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 }
 
+func (h *AuthHandler) Link(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+	providerName := c.Param("provider")
+	provider, err := h.registry.GetLogin(providerName)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "unknown provider"})
+		return
+	}
+
+	state := auth.NewState()
+	nonce := auth.NewState()
+	verifier := auth.NewVerifier()
+
+	if err := h.stateStore.Save(state, auth.FlowState{
+		Provider: provider.Name(),
+		Kind:     auth.FlowLink,
+		Nonce:    nonce,
+		Verifier: verifier,
+		ReturnTo: sanitizeReturnTo(c.Query("return_to")),
+		UserID:   userID.String(),
+	}, loginTTL); err != nil {
+		internalError(c, "save state", err)
+		return
+	}
+
+	h.writeCookie(c, stateCookieName, state, statePathFor(provider.Name()), int(loginTTL.Seconds()))
+	c.Redirect(http.StatusFound, provider.LoginAuthURL(state, nonce, verifier))
+}
+
 func (h *AuthHandler) Login(c *gin.Context) {
 	providerName := c.Param("provider")
 	provider, err := h.registry.GetLogin(providerName)
@@ -127,6 +160,10 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 
 	if fs.Kind == auth.FlowIntegration {
 		h.completeIntegration(c, providerName, code, fs)
+		return
+	}
+	if fs.Kind == auth.FlowLink {
+		h.completeLink(c, providerName, code, fs)
 		return
 	}
 
@@ -229,6 +266,82 @@ func (h *AuthHandler) findOrCreateUser(provider auth.LoginProvider, subject, ema
 		return nil, err
 	}
 	return newUser, nil
+}
+
+func (h *AuthHandler) completeLink(c *gin.Context, providerName, code string, fs auth.FlowState) {
+	provider, err := h.registry.GetLogin(providerName)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "unknown provider"})
+		return
+	}
+	userID, err := uuid.Parse(fs.UserID)
+	if err != nil || userID == uuid.Nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user in state"})
+		return
+	}
+
+	subject, _, _, err := provider.ExchangeLogin(c.Request.Context(), code, fs.Verifier, fs.Nonce)
+	if err != nil {
+		slog.Warn("link callback: exchange failed", "provider", providerName, "err", err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication failed"})
+		return
+	}
+
+	existing, err := h.users.GetByIdentity(providerName, subject)
+	if err == nil && existing != nil {
+		if existing.ID == userID {
+			c.Redirect(http.StatusFound, linkReturnTo(fs))
+			return
+		}
+		c.JSON(http.StatusConflict, gin.H{"error": "account already linked to another user"})
+		return
+	}
+	if err != nil && !errors.Is(err, repository.ErrNotFound) {
+		internalError(c, "lookup identity", err)
+		return
+	}
+
+	identity := &models.Identity{Provider: providerName, Subject: subject}
+	if err := h.users.AttachIdentity(userID, identity); err != nil {
+		internalError(c, "attach identity", err)
+		return
+	}
+
+	c.Redirect(http.StatusFound, linkReturnTo(fs))
+}
+
+func linkReturnTo(fs auth.FlowState) string {
+	if fs.ReturnTo == "" {
+		return "/profile"
+	}
+	return fs.ReturnTo
+}
+
+func (h *AuthHandler) UnlinkIdentity(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	err = h.users.DeleteIdentity(id, userID)
+	if errors.Is(err, repository.ErrLastIdentity) {
+		c.JSON(http.StatusConflict, gin.H{"error": "cannot remove last identity"})
+		return
+	}
+	if errors.Is(err, repository.ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "identity not found"})
+		return
+	}
+	if err != nil {
+		internalError(c, "delete identity", err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (h *AuthHandler) completeIntegration(c *gin.Context, providerName, code string, fs auth.FlowState) {
