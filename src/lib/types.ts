@@ -58,6 +58,7 @@ export interface OAuthIntegration {
   account_name: string
   expires_at?: string | null
   scope?: string
+  hook_secret: string
 }
 
 export interface IntegrationProviderSummary {
@@ -126,7 +127,3 @@ export interface UpdateAddonRequest {
   integration_id?: string | null
 }
 
-export interface RegisterAddonResponse {
-  addon: Addon
-  webhook_secret: string
-}

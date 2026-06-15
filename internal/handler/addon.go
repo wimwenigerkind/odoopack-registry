@@ -81,12 +81,6 @@ func (h *AddonHandler) Register(c *gin.Context) {
 		return
 	}
 
-	secret, err := generateSecret(32)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
-		return
-	}
-
 	defaultBranch := req.DefaultBranch
 	if defaultBranch == "" {
 		defaultBranch = "main"
@@ -113,7 +107,6 @@ func (h *AddonHandler) Register(c *gin.Context) {
 		GitURL:        req.GitURL,
 		DefaultBranch: defaultBranch,
 		Visibility:    visibility,
-		WebhookSecret: secret,
 		OwnerID:       userID,
 		IntegrationID: req.IntegrationID,
 	}
@@ -123,10 +116,7 @@ func (h *AddonHandler) Register(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"addon":          addon,
-		"webhook_secret": secret,
-	})
+	c.JSON(http.StatusCreated, addon)
 }
 
 func (h *AddonHandler) DeleteVersion(c *gin.Context) {

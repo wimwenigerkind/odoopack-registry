@@ -77,6 +77,7 @@ func main() {
 	userHandler := handler.NewUserHandler(userRepo)
 	tokenHandler := handler.NewTokenHandler(tokenRepo)
 	integrationHandler := handler.NewIntegrationHandler(authRegistry, stateStore, integrationRepo, viper.GetBool("auth.cookie_secure"))
+	webhookHandler := handler.NewWebhookHandler(integrationRepo, addonRepo, queue)
 
 	r := gin.Default()
 
@@ -97,7 +98,7 @@ func main() {
 	requireAdmin := middleware.RequireAdmin(sessionStore, userRepo)
 	optionalAuth := middleware.OptionalAuth(sessionStore)
 	apiKeyOptional := middleware.ApiKeyOptional(tokenRepo)
-	registerRoutes(r, mode, addonHandler, downloadHandler, triggerHandler, registryHandler, authHandler, groupHandler, userHandler, tokenHandler, integrationHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional)
+	registerRoutes(r, mode, addonHandler, downloadHandler, triggerHandler, registryHandler, authHandler, groupHandler, userHandler, tokenHandler, integrationHandler, webhookHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional)
 
 	addr := viper.GetString("server_address")
 	slog.Info("starting server", "addr", addr)
@@ -115,7 +116,7 @@ func buildStorage() (storage.Storage, error) {
 	}
 }
 
-func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, groups *handler.GroupHandler, users *handler.UserHandler, tokens *handler.TokenHandler, integrations *handler.IntegrationHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional gin.HandlerFunc) {
+func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, groups *handler.GroupHandler, users *handler.UserHandler, tokens *handler.TokenHandler, integrations *handler.IntegrationHandler, webhooks *handler.WebhookHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional gin.HandlerFunc) {
 	api := r.Group("/api/v1")
 	{
 		api.GET("/me", requireAuth, authH.Me)
@@ -168,4 +169,6 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, do
 
 	r.GET("/integrations/providers", requireAuth, integrations.ListProviders)
 	r.GET("/integrations/:provider/connect", requireAuth, integrations.Connect)
+
+	r.POST("/webhooks/bitbucket/:integration_id", webhooks.Bitbucket)
 }

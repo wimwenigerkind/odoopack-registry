@@ -31,33 +31,13 @@ export default function AddonNewPage() {
   if (!user) return <p>You must be logged in to register an addon.</p>
 
   if (register.isSuccess) {
-    const { addon, webhook_secret } = register.data
+    const addon = register.data
     return (
       <>
         <h2>Addon registered</h2>
         <p>
           <strong>{addon.name}</strong> has been registered.
         </p>
-
-        <section>
-          <h3>Webhook secret</h3>
-          <p>
-            Store this somewhere safe. It cannot be retrieved again. You will
-            need it later when configuring provider-specific webhooks.
-          </p>
-          <p>
-            <code>{webhook_secret}</code>{" "}
-            <button
-              type="button"
-              onClick={() =>
-                navigator.clipboard?.writeText(webhook_secret)
-              }
-            >
-              Copy
-            </button>
-          </p>
-        </section>
-
         <p>
           <Link to={`/addons/${addon.id}`}>Go to addon</Link>
           {" | "}

@@ -15,4 +15,5 @@ type OAuthIntegration struct {
 	RefreshToken string     `json:"-"`
 	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
 	Scope        string     `json:"scope,omitempty"`
+	HookSecret   string     `json:"hook_secret"`
 }

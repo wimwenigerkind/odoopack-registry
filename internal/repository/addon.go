@@ -55,6 +55,13 @@ func (r *AddonRepository) GetByName(name string) (*models.Addon, error) {
 	return &addon, nil
 }
 
+func (r *AddonRepository) ListByOwnerAndRepoPath(ownerID uuid.UUID, repoPath string) ([]models.Addon, error) {
+	var addons []models.Addon
+	pattern := "%" + repoPath + "%"
+	err := r.db.Where("owner_id = ? AND git_url LIKE ?", ownerID, pattern).Find(&addons).Error
+	return addons, err
+}
+
 func (r *AddonRepository) ListVisibleTo(userID *uuid.UUID, isAdmin bool, nameFilter string) ([]models.Addon, error) {
 	var addons []models.Addon
 	q := r.db.Preload("Versions").Preload("Owner")

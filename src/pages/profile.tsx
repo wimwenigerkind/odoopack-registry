@@ -166,35 +166,52 @@ function Integrations() {
               <th>Provider</th>
               <th>Account</th>
               <th>Connected</th>
-              <th>Expires</th>
+              <th>Webhook URL</th>
+              <th>Webhook Secret</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {integrations.map((i) => (
-              <tr key={i.id}>
-                <td>{i.provider}</td>
-                <td>{i.account_name || "-"}</td>
-                <td>{new Date(i.created_at).toLocaleDateString()}</td>
-                <td>
-                  {i.expires_at
-                    ? new Date(i.expires_at).toLocaleDateString()
-                    : "never"}
-                </td>
-                <td>
-                  <button
-                    onClick={() => {
-                      if (confirm(`Disconnect ${i.provider} (${i.account_name})?`)) {
-                        deleteIntegration.mutate(i.id)
-                      }
-                    }}
-                    disabled={deleteIntegration.isPending}
-                  >
-                    Disconnect
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {integrations.map((i) => {
+              const url = `${window.location.origin}/webhooks/${i.provider}/${i.id}`
+              return (
+                <tr key={i.id}>
+                  <td>{i.provider}</td>
+                  <td>{i.account_name || "-"}</td>
+                  <td>{new Date(i.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <code>{url}</code>{" "}
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard?.writeText(url)}
+                    >
+                      Copy
+                    </button>
+                  </td>
+                  <td>
+                    <code>{i.hook_secret}</code>{" "}
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard?.writeText(i.hook_secret)}
+                    >
+                      Copy
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Disconnect ${i.provider} (${i.account_name})?`)) {
+                          deleteIntegration.mutate(i.id)
+                        }
+                      }}
+                      disabled={deleteIntegration.isPending}
+                    >
+                      Disconnect
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       )}
