@@ -68,7 +68,7 @@ func main() {
 
 	mode := viper.GetString("instance.mode")
 	baseURL := viper.GetString("base_url")
-	addonHandler := handler.NewAddonHandler(addonRepo, groupRepo, userRepo, integrationRepo, mode)
+	addonHandler := handler.NewAddonHandler(addonRepo, versionRepo, groupRepo, userRepo, integrationRepo, store, mode)
 	downloadHandler := handler.NewDownloadHandler(addonRepo, versionRepo, groupRepo, userRepo, store, mode)
 	triggerHandler := handler.NewTriggerHandler(addonRepo, userRepo, queue)
 	registryHandler := handler.NewRegistryHandler(addonRepo, versionRepo, groupRepo, userRepo, store, mode, baseURL)
@@ -124,6 +124,7 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, do
 		api.GET("/addons/:id", optionalAuth, addons.Get)
 		api.PUT("/addons/:id", requireAuth, addons.Update)
 		api.GET("/addons/:id/versions/:version/download", optionalAuth, downloads.Zipball)
+		api.DELETE("/addons/:id/versions/:version", requireAuth, addons.DeleteVersion)
 		api.POST("/addons/:id/sync", requireAuth, triggers.Sync)
 
 		api.POST("/me/tokens", requireAuth, tokens.Create)

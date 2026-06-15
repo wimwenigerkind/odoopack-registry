@@ -61,6 +61,17 @@ func (r *AddonVersionRepository) UpdateStatus(id uuid.UUID, status models.Versio
 	}).Error
 }
 
+func (r *AddonVersionRepository) Delete(id uuid.UUID) error {
+	res := r.db.Where("id = ?", id).Delete(&models.AddonVersion{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (r *AddonVersionRepository) SetReady(id uuid.UUID, storageKey, contentHash string, sizeBytes int64) error {
 	now := time.Now()
 	return r.db.Model(&models.AddonVersion{}).Where("id = ?", id).Updates(map[string]any{

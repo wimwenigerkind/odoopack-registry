@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -11,18 +12,21 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
+	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
 )
 
 type AddonHandler struct {
 	addons       *repository.AddonRepository
+	versions     *repository.AddonVersionRepository
 	groups       *repository.GroupRepository
 	users        *repository.UserRepository
 	integrations *repository.IntegrationRepository
+	storage      storage.Storage
 	mode         string
 }
 
-func NewAddonHandler(addons *repository.AddonRepository, groups *repository.GroupRepository, users *repository.UserRepository, integrations *repository.IntegrationRepository, mode string) *AddonHandler {
-	return &AddonHandler{addons: addons, groups: groups, users: users, integrations: integrations, mode: mode}
+func NewAddonHandler(addons *repository.AddonRepository, versions *repository.AddonVersionRepository, groups *repository.GroupRepository, users *repository.UserRepository, integrations *repository.IntegrationRepository, store storage.Storage, mode string) *AddonHandler {
+	return &AddonHandler{addons: addons, versions: versions, groups: groups, users: users, integrations: integrations, storage: store, mode: mode}
 }
 
 type registerAddonRequest struct {
@@ -123,6 +127,51 @@ func (h *AddonHandler) Register(c *gin.Context) {
 		"addon":          addon,
 		"webhook_secret": secret,
 	})
+}
+
+func (h *AddonHandler) DeleteVersion(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	version := c.Param("version")
+
+	addon, err := h.addons.GetByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+	if !canWriteAddon(c, addon, h.users) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
+		return
+	}
+
+	av, err := h.versions.Get(addon.ID, version)
+	if errors.Is(err, repository.ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "version not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+
+	if av.StorageKey != "" {
+		if err := h.storage.Delete(context.Background(), av.StorageKey); err != nil && !errors.Is(err, storage.ErrNotFound) {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not remove zipball"})
+			return
+		}
+	}
+	if err := h.versions.Delete(av.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 type updateAddonRequest struct {

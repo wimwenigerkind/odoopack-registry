@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router"
 import { useAddon } from "@/hooks/addons/use-addon"
 import { useMe } from "@/hooks/auth/use-me"
 import { useSyncAddon } from "@/hooks/addons/use-sync-addon"
+import { useDeleteVersion } from "@/hooks/addons/use-delete-version"
 import { Avatar } from "@/components/avatar"
 import type { VersionStatus } from "@/lib/types"
 
@@ -10,6 +11,7 @@ export default function AddonDetailPage() {
   const { data: addon, isLoading, isError } = useAddon(id)
   const { data: user } = useMe()
   const sync = useSyncAddon(id)
+  const deleteVersion = useDeleteVersion(id)
 
   if (isLoading) return <p>Loading…</p>
   if (isError) return <p>Could not load addon</p>
@@ -75,6 +77,7 @@ export default function AddonDetailPage() {
               <th>Size</th>
               <th>Built</th>
               <th>Download</th>
+              {isOwner && <th></th>}
             </tr>
           </thead>
           <tbody>
@@ -104,6 +107,20 @@ export default function AddonDetailPage() {
                     "-"
                   )}
                 </td>
+                {isOwner && (
+                  <td>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Delete version "${v.version}"?`)) {
+                          deleteVersion.mutate(v.version)
+                        }
+                      }}
+                      disabled={deleteVersion.isPending}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
