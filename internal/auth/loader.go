@@ -42,6 +42,15 @@ func LoadProviders(ctx context.Context, baseURL string) (map[string]Provider, er
 				ClientSecret:        viper.GetString("auth." + name + ".client_secret"),
 			}
 			out[name] = NewGitHubProvider(name, gc, callback)
+		case string(ProviderTypeBitbucket):
+			bc := BitbucketConfig{
+				AllowLogin:          viper.GetBool("auth." + name + ".allow_login"),
+				AllowRegister:       viper.GetBool("auth." + name + ".allow_register"),
+				AllowGitIntegration: viper.GetBool("auth." + name + ".allow_git_integration"),
+				ClientID:            viper.GetString("auth." + name + ".client_id"),
+				ClientSecret:        viper.GetString("auth." + name + ".client_secret"),
+			}
+			out[name] = NewBitbucketProvider(name, bc, callback)
 		case string(ProviderTypeEntra):
 			ec := EntraConfig{
 				AllowLogin:    viper.GetBool("auth." + name + ".allow_login"),

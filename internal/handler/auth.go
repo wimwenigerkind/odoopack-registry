@@ -250,7 +250,10 @@ func (h *AuthHandler) completeIntegration(c *gin.Context, providerName, code str
 		return
 	}
 
-	accountName, _ := provider.FetchAccountName(c.Request.Context(), accessToken)
+	accountName, accountErr := provider.FetchAccountName(c.Request.Context(), accessToken)
+	if accountErr != nil {
+		slog.Warn("integration callback: fetch account name", "provider", providerName, "err", accountErr)
+	}
 
 	it := &models.OAuthIntegration{
 		Provider:     providerName,

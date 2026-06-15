@@ -99,13 +99,13 @@ function Integrations() {
       ) : providers.length === 0 ? (
         <p>No integration providers configured on this server.</p>
       ) : (
-        <p>
+        <ul>
           {providers.map((p) => (
-            <a key={p.name} href={connectHref(p.name)}>
-              Connect {p.name}{" "}
-            </a>
+            <li key={p.name}>
+              <a href={connectHref(p.name)}>Connect {p.name}</a>
+            </li>
           ))}
-        </p>
+        </ul>
       )}
 
       {isLoading && <p>Loading integrations...</p>}
