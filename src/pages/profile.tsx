@@ -14,6 +14,7 @@ import {
   useIntegrationProviders,
   useIntegrations,
 } from "@/hooks/integrations/use-integrations"
+import { useCreateWorkspaceHook } from "@/hooks/integrations/use-create-workspace-hook"
 import { BACKEND_BASE } from "@/lib/api"
 
 export default function ProfilePage() {
@@ -168,54 +169,104 @@ function Integrations() {
               <th>Connected</th>
               <th>Webhook URL</th>
               <th>Webhook Secret</th>
+              <th>Workspace Hook</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {integrations.map((i) => {
-              const url = `${window.location.origin}/webhooks/${i.provider}/${i.id}`
-              return (
-                <tr key={i.id}>
-                  <td>{i.provider}</td>
-                  <td>{i.account_name || "-"}</td>
-                  <td>{new Date(i.created_at).toLocaleDateString()}</td>
-                  <td>
-                    <code>{url}</code>{" "}
-                    <button
-                      type="button"
-                      onClick={() => navigator.clipboard?.writeText(url)}
-                    >
-                      Copy
-                    </button>
-                  </td>
-                  <td>
-                    <code>{i.hook_secret}</code>{" "}
-                    <button
-                      type="button"
-                      onClick={() => navigator.clipboard?.writeText(i.hook_secret)}
-                    >
-                      Copy
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Disconnect ${i.provider} (${i.account_name})?`)) {
-                          deleteIntegration.mutate(i.id)
-                        }
-                      }}
-                      disabled={deleteIntegration.isPending}
-                    >
-                      Disconnect
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
+            {integrations.map((i) => (
+              <IntegrationRow
+                key={i.id}
+                integration={i}
+                onDisconnect={() => deleteIntegration.mutate(i.id)}
+                disconnectPending={deleteIntegration.isPending}
+              />
+            ))}
           </tbody>
         </table>
       )}
     </>
+  )
+}
+
+function IntegrationRow({
+  integration: i,
+  onDisconnect,
+  disconnectPending,
+}: {
+  integration: import("@/lib/types").OAuthIntegration
+  onDisconnect: () => void
+  disconnectPending: boolean
+}) {
+  const url = `${window.location.origin}/webhooks/${i.provider}/${i.id}`
+  const createHook = useCreateWorkspaceHook(i.id)
+  const [workspace, setWorkspace] = useState("")
+
+  const submitHook = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!workspace.trim()) return
+    createHook.mutate(workspace.trim(), {
+      onSuccess: () => setWorkspace(""),
+    })
+  }
+
+  return (
+    <tr>
+      <td>{i.provider}</td>
+      <td>{i.account_name || "-"}</td>
+      <td>{new Date(i.created_at).toLocaleDateString()}</td>
+      <td>
+        <code>{url}</code>{" "}
+        <button type="button" onClick={() => navigator.clipboard?.writeText(url)}>
+          Copy
+        </button>
+      </td>
+      <td>
+        <code>{i.hook_secret}</code>{" "}
+        <button type="button" onClick={() => navigator.clipboard?.writeText(i.hook_secret)}>
+          Copy
+        </button>
+      </td>
+      <td>
+        {i.provider === "bitbucket" ? (
+          <form onSubmit={submitHook}>
+            <input
+              type="text"
+              value={workspace}
+              onChange={(e) => setWorkspace(e.target.value)}
+              placeholder="workspace-slug"
+            />{" "}
+            <button type="submit" disabled={createHook.isPending}>
+              {createHook.isPending ? "Creating..." : "Create"}
+            </button>
+            {createHook.isSuccess && (
+              <p>
+                <small>Created hook {createHook.data.hook_uuid}</small>
+              </p>
+            )}
+            {createHook.isError && (
+              <p>
+                <small>Error: {createHook.error.message}</small>
+              </p>
+            )}
+          </form>
+        ) : (
+          <small>n/a</small>
+        )}
+      </td>
+      <td>
+        <button
+          onClick={() => {
+            if (confirm(`Disconnect ${i.provider} (${i.account_name})?`)) {
+              onDisconnect()
+            }
+          }}
+          disabled={disconnectPending}
+        >
+          Disconnect
+        </button>
+      </td>
+    </tr>
   )
 }
 

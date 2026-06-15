@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -67,7 +68,10 @@ func main() {
 	defer sessionStore.Stop()
 
 	mode := viper.GetString("instance.mode")
-	baseURL := viper.GetString("base_url")
+	baseURL := strings.TrimSpace(viper.GetString("base_url"))
+	if baseURL == "" {
+		fatal("config", fmt.Errorf("base_url must be set"))
+	}
 	addonHandler := handler.NewAddonHandler(addonRepo, versionRepo, groupRepo, userRepo, integrationRepo, store, mode)
 	downloadHandler := handler.NewDownloadHandler(addonRepo, versionRepo, groupRepo, userRepo, store, mode)
 	triggerHandler := handler.NewTriggerHandler(addonRepo, userRepo, queue)
@@ -76,7 +80,7 @@ func main() {
 	groupHandler := handler.NewGroupHandler(groupRepo)
 	userHandler := handler.NewUserHandler(userRepo)
 	tokenHandler := handler.NewTokenHandler(tokenRepo)
-	integrationHandler := handler.NewIntegrationHandler(authRegistry, stateStore, integrationRepo, viper.GetBool("auth.cookie_secure"))
+	integrationHandler := handler.NewIntegrationHandler(authRegistry, stateStore, integrationRepo, viper.GetBool("auth.cookie_secure"), baseURL)
 	webhookHandler := handler.NewWebhookHandler(integrationRepo, addonRepo, queue)
 
 	r := gin.Default()
@@ -134,6 +138,7 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, do
 
 		api.GET("/me/integrations", requireAuth, integrations.List)
 		api.DELETE("/me/integrations/:id", requireAuth, integrations.Delete)
+		api.POST("/me/integrations/:id/workspace-hooks", requireAuth, integrations.CreateWorkspaceHook)
 	}
 
 	if mode == "private" {
