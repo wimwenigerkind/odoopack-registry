@@ -4,13 +4,21 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 )
+
+var scpStyleRe = regexp.MustCompile(`^([^@:/\s]+)@([^@:/\s]+):([^/].*)$`)
 
 func GitURL(raw string) error {
 	s := strings.TrimSpace(raw)
 	if s == "" {
 		return fmt.Errorf("git URL is required")
+	}
+	if !strings.Contains(s, "://") {
+		if m := scpStyleRe.FindStringSubmatch(s); m != nil {
+			s = "ssh://" + m[1] + "@" + m[2] + "/" + m[3]
+		}
 	}
 	u, err := url.Parse(s)
 	if err != nil {
