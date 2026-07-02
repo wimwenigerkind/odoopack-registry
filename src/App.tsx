@@ -5,6 +5,7 @@ import RootLayout from "@/layouts/root.tsx";
 import AddonDetailPage from "@/pages/addon-detail.tsx";
 import AddonEditPage from "@/pages/addon-edit.tsx";
 import AddonNewPage from "@/pages/addon-new.tsx";
+import RepoDetailPage from "@/pages/repo-detail.tsx";
 import ProfilePage from "@/pages/profile.tsx";
 import AdminUsersPage from "@/pages/admin/users.tsx";
 import AdminGroupsPage from "@/pages/admin/groups.tsx";
@@ -20,6 +21,7 @@ const router = createBrowserRouter([
       { path: "/addons/new", element: <AddonNewPage/> },
       { path: "/addons/:id", element: <AddonDetailPage/> },
       { path: "/addons/:id/edit", element: <AddonEditPage/> },
+      { path: "/repos/:id", element: <RepoDetailPage/> },
     ]
   },
   {

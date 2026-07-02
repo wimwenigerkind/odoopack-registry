@@ -107,13 +107,17 @@ func (h *WebhookHandler) Bitbucket(c *gin.Context) {
 
 	queued := 0
 	for _, addon := range addons {
+		if addon.Repo == nil {
+			continue
+		}
 		h.queue.Enqueue(worker.SyncJob{
 			AddonID:       addon.ID,
 			Name:          addon.Name,
-			GitURL:        addon.GitURL,
-			DefaultBranch: addon.DefaultBranch,
+			GitURL:        addon.Repo.GitURL,
+			DefaultBranch: addon.Repo.DefaultBranch,
+			Subpath:       addon.Subpath,
 			Trigger:       "webhook",
-			IntegrationID: addon.IntegrationID,
+			IntegrationID: addon.Repo.IntegrationID,
 		})
 		queued++
 	}

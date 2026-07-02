@@ -41,13 +41,18 @@ func (h *TriggerHandler) Sync(c *gin.Context) {
 		return
 	}
 
+	if addon.Repo == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "addon has no repo"})
+		return
+	}
 	h.queue.Enqueue(worker.SyncJob{
 		AddonID:       addon.ID,
 		Name:          addon.Name,
-		GitURL:        addon.GitURL,
-		DefaultBranch: addon.DefaultBranch,
+		GitURL:        addon.Repo.GitURL,
+		DefaultBranch: addon.Repo.DefaultBranch,
+		Subpath:       addon.Subpath,
 		Trigger:       "manual",
-		IntegrationID: addon.IntegrationID,
+		IntegrationID: addon.Repo.IntegrationID,
 	})
 
 	c.JSON(http.StatusAccepted, gin.H{"status": "queued"})

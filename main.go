@@ -45,6 +45,7 @@ func main() {
 	}
 
 	addonRepo := repository.NewAddonRepository(db)
+	repoRepo := repository.NewRepoRepository(db)
 	versionRepo := repository.NewAddonVersionRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	groupRepo := repository.NewGroupRepository(db)
@@ -72,10 +73,11 @@ func main() {
 	if baseURL == "" {
 		fatal("config", fmt.Errorf("base_url must be set"))
 	}
-	addonHandler := handler.NewAddonHandler(addonRepo, versionRepo, groupRepo, userRepo, integrationRepo, store, mode)
+	addonHandler := handler.NewAddonHandler(addonRepo, repoRepo, versionRepo, groupRepo, userRepo, integrationRepo, store, mode)
+	repoHandler := handler.NewRepoHandler(repoRepo, addonRepo, groupRepo, userRepo, integrationRepo, mode)
 	downloadHandler := handler.NewDownloadHandler(addonRepo, versionRepo, groupRepo, userRepo, store, mode)
 	triggerHandler := handler.NewTriggerHandler(addonRepo, userRepo, queue)
-	registryHandler := handler.NewRegistryHandler(addonRepo, versionRepo, groupRepo, userRepo, store, mode, baseURL)
+	registryHandler := handler.NewRegistryHandler(addonRepo, groupRepo, userRepo, integrationRepo, authRegistry, store, mode, baseURL)
 	authHandler := handler.NewAuthHandler(authRegistry, stateStore, sessionStore, userRepo, integrationRepo, viper.GetBool("auth.cookie_secure"))
 	groupHandler := handler.NewGroupHandler(groupRepo)
 	userHandler := handler.NewUserHandler(userRepo)
@@ -102,7 +104,7 @@ func main() {
 	requireAdmin := middleware.RequireAdmin(sessionStore, userRepo)
 	optionalAuth := middleware.OptionalAuth(sessionStore)
 	apiKeyOptional := middleware.ApiKeyOptional(tokenRepo)
-	registerRoutes(r, mode, addonHandler, downloadHandler, triggerHandler, registryHandler, authHandler, groupHandler, userHandler, tokenHandler, integrationHandler, webhookHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional)
+	registerRoutes(r, mode, addonHandler, repoHandler, downloadHandler, triggerHandler, registryHandler, authHandler, groupHandler, userHandler, tokenHandler, integrationHandler, webhookHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional)
 
 	addr := viper.GetString("server_address")
 	slog.Info("starting server", "addr", addr)
@@ -120,7 +122,7 @@ func buildStorage() (storage.Storage, error) {
 	}
 }
 
-func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, groups *handler.GroupHandler, users *handler.UserHandler, tokens *handler.TokenHandler, integrations *handler.IntegrationHandler, webhooks *handler.WebhookHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional gin.HandlerFunc) {
+func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, repos *handler.RepoHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, groups *handler.GroupHandler, users *handler.UserHandler, tokens *handler.TokenHandler, integrations *handler.IntegrationHandler, webhooks *handler.WebhookHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional gin.HandlerFunc) {
 	api := r.Group("/api/v1")
 	{
 		api.GET("/me", requireAuth, authH.Me)
@@ -128,9 +130,15 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, do
 		api.POST("/addons", requireAuth, addons.Register)
 		api.GET("/addons/:id", optionalAuth, addons.Get)
 		api.PUT("/addons/:id", requireAuth, addons.Update)
+		api.DELETE("/addons/:id", requireAuth, addons.Delete)
 		api.GET("/addons/:id/versions/:version/download", optionalAuth, downloads.Zipball)
 		api.DELETE("/addons/:id/versions/:version", requireAuth, addons.DeleteVersion)
 		api.POST("/addons/:id/sync", requireAuth, triggers.Sync)
+
+		api.GET("/repos/:id", optionalAuth, repos.Get)
+		api.PUT("/repos/:id", requireAuth, repos.Update)
+		api.DELETE("/repos/:id", requireAuth, repos.Delete)
+		api.GET("/me/repos", requireAuth, repos.ListMine)
 
 		api.POST("/me/tokens", requireAuth, tokens.Create)
 		api.GET("/me/tokens", requireAuth, tokens.List)
@@ -159,7 +167,7 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, do
 	reg := r.Group("/registry/v1")
 	{
 		reg.GET("/addons/*name", apiKeyOptional, registry.Get)
-		reg.GET("/zipball/:addon_id/:version", apiKeyOptional, registry.Zipball)
+		reg.GET("/zipball/:addon_id/:reference", apiKeyOptional, registry.Zipball)
 	}
 
 	r.GET("/auth/providers", authH.ListProviders)

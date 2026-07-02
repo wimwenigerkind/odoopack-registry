@@ -2,41 +2,28 @@ import { type FormEvent, useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
 import { useAddon } from "@/hooks/addons/use-addon"
 import { useUpdateAddon } from "@/hooks/addons/use-update-addon"
-import { useIntegrations } from "@/hooks/integrations/use-integrations"
 import type { Visibility } from "@/lib/types"
 
 export default function AddonEditPage() {
   const { id = "" } = useParams()
   const { data: addon, isLoading, isError } = useAddon(id)
-  const { data: integrations } = useIntegrations()
   const update = useUpdateAddon(id)
   const navigate = useNavigate()
 
-  const [gitUrl, setGitUrl] = useState("")
-  const [defaultBranch, setDefaultBranch] = useState("")
+  const [subpath, setSubpath] = useState("")
   const [visibility, setVisibility] = useState<Visibility>("public")
-  const [integrationID, setIntegrationID] = useState("")
 
   useEffect(() => {
     if (!addon) return
-    setGitUrl(addon.git_url)
-    setDefaultBranch(addon.default_branch)
+    setSubpath(addon.subpath ?? "")
     setVisibility(addon.visibility)
-    setIntegrationID(addon.integration_id ?? "")
   }, [addon])
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     update.mutate(
-      {
-        git_url: gitUrl,
-        default_branch: defaultBranch,
-        visibility,
-        integration_id: integrationID || null,
-      },
-      {
-        onSuccess: () => navigate(`/addons/${id}`),
-      },
+      { subpath, visibility },
+      { onSuccess: () => navigate(`/addons/${id}`) },
     )
   }
 
@@ -50,26 +37,22 @@ export default function AddonEditPage() {
       </p>
       <h2>Edit {addon.name}</h2>
 
+      <p>
+        <small>
+          Repo-level settings (git URL, default branch, integration) live on the{" "}
+          <Link to={`/repos/${addon.repo_id}`}>repo</Link>.
+        </small>
+      </p>
+
       <form onSubmit={handleSubmit}>
         <p>
           <label>
-            Git URL
+            Subpath
             <br />
             <input
-              required
-              value={gitUrl}
-              onChange={(e) => setGitUrl(e.target.value)}
-            />
-          </label>
-        </p>
-
-        <p>
-          <label>
-            Default branch
-            <br />
-            <input
-              value={defaultBranch}
-              onChange={(e) => setDefaultBranch(e.target.value)}
+              value={subpath}
+              onChange={(e) => setSubpath(e.target.value)}
+              placeholder="(empty = repo root)"
             />
           </label>
         </p>
@@ -84,25 +67,6 @@ export default function AddonEditPage() {
             >
               <option value="public">Public</option>
               <option value="private">Private</option>
-            </select>
-          </label>
-        </p>
-
-        <p>
-          <label>
-            Integration
-            <br />
-            <select
-              value={integrationID}
-              onChange={(e) => setIntegrationID(e.target.value)}
-            >
-              <option value="">None (anonymous clone)</option>
-              {(integrations ?? []).map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.provider}
-                  {i.account_name ? ` (${i.account_name})` : ""}
-                </option>
-              ))}
             </select>
           </label>
         </p>

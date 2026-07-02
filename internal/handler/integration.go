@@ -81,6 +81,18 @@ func (h *IntegrationHandler) Connect(c *gin.Context) {
 	c.Redirect(http.StatusFound, provider.IntegrationAuthURL(state))
 }
 
+type integrationDetail struct {
+	ID          uuid.UUID  `json:"id"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	Provider    string     `json:"provider"`
+	OwnerID     uuid.UUID  `json:"owner_id"`
+	AccountName string     `json:"account_name"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	Scope       string     `json:"scope,omitempty"`
+	HookSecret  string     `json:"hook_secret"`
+}
+
 func (h *IntegrationHandler) List(c *gin.Context) {
 	userID, ok := middleware.CurrentUserID(c)
 	if !ok {
@@ -92,7 +104,21 @@ func (h *IntegrationHandler) List(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
-	c.JSON(http.StatusOK, items)
+	out := make([]integrationDetail, len(items))
+	for i := range items {
+		out[i] = integrationDetail{
+			ID:          items[i].ID,
+			CreatedAt:   items[i].CreatedAt,
+			UpdatedAt:   items[i].UpdatedAt,
+			Provider:    items[i].Provider,
+			OwnerID:     items[i].OwnerID,
+			AccountName: items[i].AccountName,
+			ExpiresAt:   items[i].ExpiresAt,
+			Scope:       items[i].Scope,
+			HookSecret:  items[i].HookSecret,
+		}
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 type createWorkspaceHookRequest struct {

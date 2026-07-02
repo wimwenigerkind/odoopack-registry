@@ -23,17 +23,20 @@ func (r *AddonRepository) Create(addon *models.Addon) error {
 }
 
 func (r *AddonRepository) Update(addon *models.Addon) error {
-	return r.db.Model(addon).Select("git_url", "default_branch", "visibility", "integration_id").Updates(map[string]any{
-		"git_url":        addon.GitURL,
-		"default_branch": addon.DefaultBranch,
-		"visibility":     addon.Visibility,
-		"integration_id": addon.IntegrationID,
+	return r.db.Model(addon).Select("subpath", "visibility").Updates(map[string]any{
+		"subpath":    addon.Subpath,
+		"visibility": addon.Visibility,
 	}).Error
 }
 
 func (r *AddonRepository) GetByID(id uuid.UUID) (*models.Addon, error) {
 	var addon models.Addon
-	err := r.db.Preload("Versions").Preload("Owner").Preload("Integration").Where("id = ?", id).First(&addon).Error
+	err := r.db.
+		Preload("Versions").
+		Preload("Repo").
+		Preload("Repo.Owner").
+		Preload("Repo.Integration").
+		Where("id = ?", id).First(&addon).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
 	}
@@ -45,7 +48,11 @@ func (r *AddonRepository) GetByID(id uuid.UUID) (*models.Addon, error) {
 
 func (r *AddonRepository) GetByName(name string) (*models.Addon, error) {
 	var addon models.Addon
-	err := r.db.Preload("Versions").Preload("Owner").Where("name = ?", name).First(&addon).Error
+	err := r.db.
+		Preload("Versions").
+		Preload("Repo").
+		Preload("Repo.Owner").
+		Where("name = ?", name).First(&addon).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
 	}
@@ -55,29 +62,74 @@ func (r *AddonRepository) GetByName(name string) (*models.Addon, error) {
 	return &addon, nil
 }
 
+func (r *AddonRepository) Delete(id uuid.UUID) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("addon_id = ?", id).Delete(&models.GroupAddonAccess{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("addon_id = ?", id).Delete(&models.AddonVersion{}).Error; err != nil {
+			return err
+		}
+		res := tx.Where("id = ?", id).Delete(&models.Addon{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrNotFound
+		}
+		return nil
+	})
+}
+
+func (r *AddonRepository) ListByRepo(repoID uuid.UUID) ([]models.Addon, error) {
+	var addons []models.Addon
+	err := r.db.Where("repo_id = ?", repoID).Order("name").Find(&addons).Error
+	return addons, err
+}
+
 func (r *AddonRepository) ListByOwnerAndRepoPath(ownerID uuid.UUID, repoPath string) ([]models.Addon, error) {
 	var addons []models.Addon
 	pattern := "%" + repoPath + "%"
-	err := r.db.Where("owner_id = ? AND git_url LIKE ?", ownerID, pattern).Find(&addons).Error
+	err := r.db.
+		Preload("Repo").
+		Joins("Repo").
+		Where(`"Repo".owner_id = ?`, ownerID).
+		Where(`"Repo".git_url LIKE ?`, pattern).
+		Find(&addons).Error
 	return addons, err
 }
 
 func (r *AddonRepository) ListVisibleTo(userID *uuid.UUID, isAdmin bool, nameFilter string) ([]models.Addon, error) {
 	var addons []models.Addon
-	q := r.db.Preload("Versions").Preload("Owner")
+	q := r.db.
+		Preload("Versions").
+		Preload("Repo").
+		Preload("Repo.Owner").
+		Joins("Repo")
+
 	if nameFilter != "" {
-		q = q.Where("name = ?", nameFilter)
+		q = q.Where("addons.name = ?", nameFilter)
 	}
+
 	switch {
 	case isAdmin:
 	case userID == nil:
-		q = q.Where("visibility = ?", models.VisibilityPublic)
+		q = q.Where("addons.visibility = ?", models.VisibilityPublic)
 	default:
+		groupGrant := r.db.
+			Table("group_memberships AS gm").
+			Select("1").
+			Joins("JOIN group_addon_accesses gaa ON gaa.group_id = gm.group_id").
+			Where("gm.user_id = ?", *userID).
+			Where("gaa.addon_id = addons.id")
+
 		q = q.Where(
-			"visibility = ? OR owner_id = ? OR EXISTS (SELECT 1 FROM group_memberships gm JOIN group_addon_accesses gaa ON gaa.group_id = gm.group_id WHERE gm.user_id = ? AND gaa.addon_id = addons.id)",
-			models.VisibilityPublic, *userID, *userID,
+			r.db.Where("addons.visibility = ?", models.VisibilityPublic).
+				Or(`"Repo".owner_id = ?`, *userID).
+				Or("EXISTS (?)", groupGrant),
 		)
 	}
+
 	err := q.Find(&addons).Error
 	return addons, err
 }

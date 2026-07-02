@@ -28,7 +28,7 @@ export default function RootLayout() {
         <section>
           <h2>
             <Link to="/profile">
-              <Avatar email={user.email} size={32} />
+              <Avatar hash={user.gravatar_hash} size={32} />
               {" "}{displayName}
             </Link>
           </h2>

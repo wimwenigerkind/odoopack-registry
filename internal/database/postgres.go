@@ -23,15 +23,16 @@ func Migrate(db *gorm.DB) error {
 	}
 
 	err := db.AutoMigrate(
-		&models.Addon{},
-		&models.AddonVersion{},
 		&models.User{},
 		&models.Identity{},
+		&models.OAuthIntegration{},
+		&models.Repo{},
+		&models.Addon{},
+		&models.AddonVersion{},
 		&models.Group{},
 		&models.GroupMembership{},
 		&models.GroupAddonAccess{},
 		&models.ApiToken{},
-		&models.OAuthIntegration{},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)

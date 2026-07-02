@@ -3,7 +3,8 @@ export interface User {
   created_at: string
   updated_at: string
   username: string
-  email: string
+  email?: string
+  gravatar_hash?: string
   is_admin: boolean
   identities?: Identity[]
 }
@@ -58,7 +59,7 @@ export interface OAuthIntegration {
   account_name: string
   expires_at?: string | null
   scope?: string
-  hook_secret: string
+  hook_secret?: string
 }
 
 export interface IntegrationProviderSummary {
@@ -97,18 +98,28 @@ export interface AddonVersion {
   built_at?: string | null
 }
 
+export interface Repo {
+  id: string
+  created_at: string
+  updated_at: string
+  git_url: string
+  default_branch: string
+  owner_id: string
+  owner?: User
+  integration_id?: string | null
+  integration?: OAuthIntegration | null
+  addons?: Addon[]
+}
+
 export interface Addon {
   id: string
   created_at: string
   updated_at: string
   name: string
-  git_url: string
-  default_branch: string
+  repo_id: string
+  repo?: Repo
+  subpath?: string
   visibility: Visibility
-  owner_id: string
-  owner?: User
-  integration_id?: string | null
-  integration?: OAuthIntegration | null
   versions?: AddonVersion[]
 }
 
@@ -116,14 +127,18 @@ export interface RegisterAddonRequest {
   name: string
   git_url: string
   default_branch?: string
+  subpath?: string
   visibility?: Visibility
   integration_id?: string
 }
 
 export interface UpdateAddonRequest {
-  git_url: string
-  default_branch?: string
+  subpath?: string
   visibility?: Visibility
+}
+
+export interface UpdateRepoRequest {
+  default_branch?: string
   integration_id?: string | null
 }
 

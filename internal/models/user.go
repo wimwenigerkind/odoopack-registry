@@ -5,9 +5,10 @@ import "github.com/google/uuid"
 type User struct {
 	Base
 	Username   string     `json:"username"`
-	Email      string     `gorm:"index" json:"email"`
+	Email      string     `gorm:"index" json:"email,omitempty"`
 	IsAdmin    bool       `gorm:"not null;default:false" json:"is_admin"`
 	Identities []Identity `json:"identities,omitempty"`
+	GravatarHash string `gorm:"-" json:"gravatar_hash,omitempty"`
 }
 
 type Identity struct {

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -23,6 +24,10 @@ type Ref struct {
 
 func LsRemote(url string) ([]Ref, error) {
 	cmd := exec.Command("git", "ls-remote", "--tags", "--heads", url)
+	cmd.Env = append(os.Environ(),
+		"GIT_ALLOW_PROTOCOL=https:ssh",
+		"GIT_PROTOCOL_FROM_USER=0",
+	)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

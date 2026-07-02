@@ -15,6 +15,7 @@ import {
   useIntegrations,
 } from "@/hooks/integrations/use-integrations"
 import { useCreateWorkspaceHook } from "@/hooks/integrations/use-create-workspace-hook"
+import { useMyRepos } from "@/hooks/repos/use-my-repos"
 import { BACKEND_BASE } from "@/lib/api"
 
 export default function ProfilePage() {
@@ -34,7 +35,7 @@ export default function ProfilePage() {
 
       <h2>Profile</h2>
 
-      <Avatar email={user.email} size={64} />
+      <Avatar hash={user.gravatar_hash} size={64} />
 
       <dl>
         <dt>Username</dt>
@@ -53,9 +54,59 @@ export default function ProfilePage() {
 
       <LinkAccounts />
 
+      <MyRepos />
+
       <Tokens />
 
       <Integrations />
+    </>
+  )
+}
+
+function MyRepos() {
+  const { data: repos, isLoading, isError } = useMyRepos()
+
+  return (
+    <>
+      <h3>My Repos</h3>
+      {isLoading && <p>Loading repos...</p>}
+      {isError && <p>Could not load repos.</p>}
+      {repos && repos.length === 0 && (
+        <p>
+          You don't own any repos yet.{" "}
+          <Link to="/addons/new">Register an addon</Link> to create one.
+        </p>
+      )}
+      {repos && repos.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>Git URL</th>
+              <th>Default branch</th>
+              <th>Integration</th>
+              <th>Registered</th>
+            </tr>
+          </thead>
+          <tbody>
+            {repos.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  <Link to={`/repos/${r.id}`}>
+                    <code>{r.git_url}</code>
+                  </Link>
+                </td>
+                <td>{r.default_branch}</td>
+                <td>
+                  {r.integration
+                    ? `${r.integration.provider}${r.integration.account_name ? ` (${r.integration.account_name})` : ""}`
+                    : "-"}
+                </td>
+                <td>{new Date(r.created_at).toLocaleDateString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </>
   )
 }

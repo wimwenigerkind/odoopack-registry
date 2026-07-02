@@ -1,8 +1,9 @@
-import { Link, useParams } from "react-router"
+import { Link, useNavigate, useParams } from "react-router"
 import { useAddon } from "@/hooks/addons/use-addon"
 import { useMe } from "@/hooks/auth/use-me"
 import { useSyncAddon } from "@/hooks/addons/use-sync-addon"
 import { useDeleteVersion } from "@/hooks/addons/use-delete-version"
+import { useDeleteAddon } from "@/hooks/addons/use-delete-addon"
 import { Avatar } from "@/components/avatar"
 import type { VersionStatus } from "@/lib/types"
 
@@ -12,12 +13,14 @@ export default function AddonDetailPage() {
   const { data: user } = useMe()
   const sync = useSyncAddon(id)
   const deleteVersion = useDeleteVersion(id)
+  const deleteAddon = useDeleteAddon()
+  const navigate = useNavigate()
 
   if (isLoading) return <p>Loading…</p>
   if (isError) return <p>Could not load addon</p>
   if (!addon) return <p>Addon not found</p>
 
-  const isOwner = user?.id === addon.owner_id
+  const isOwner = user?.id === addon.repo?.owner_id
   const versions = addon.versions ?? []
 
   return (
@@ -33,21 +36,29 @@ export default function AddonDetailPage() {
       <dl>
         <dt>Owner</dt>
         <dd style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {addon.owner?.email && <Avatar email={addon.owner.email} size={24} />}
-          {addon.owner?.username ?? "-"}
+          <Avatar hash={addon.repo?.owner?.gravatar_hash} size={24} />
+          {addon.repo?.owner?.username ?? "-"}
         </dd>
         <dt>Visibility</dt>
         <dd>{addon.visibility}</dd>
-        <dt>Git URL</dt>
+        <dt>Repo</dt>
         <dd>
-          <code>{addon.git_url}</code>
+          {addon.repo ? (
+            <Link to={`/repos/${addon.repo.id}`}>
+              <code>{addon.repo.git_url}</code>
+            </Link>
+          ) : (
+            "-"
+          )}
         </dd>
+        <dt>Subpath</dt>
+        <dd>{addon.subpath ? <code>{addon.subpath}</code> : "(repo root)"}</dd>
         <dt>Default branch</dt>
-        <dd>{addon.default_branch}</dd>
+        <dd>{addon.repo?.default_branch ?? "-"}</dd>
         <dt>Integration</dt>
         <dd>
-          {addon.integration
-            ? `${addon.integration.provider}${addon.integration.account_name ? ` (${addon.integration.account_name})` : ""}`
+          {addon.repo?.integration
+            ? `${addon.repo.integration.provider}${addon.repo.integration.account_name ? ` (${addon.repo.integration.account_name})` : ""}`
             : "none (anonymous clone)"}
         </dd>
       </dl>
@@ -125,6 +136,33 @@ export default function AddonDetailPage() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {isOwner && (
+        <section>
+          <h3>Danger zone</h3>
+          <p>
+            <small>
+              Removes the addon, all its versions, and built zipballs. The
+              underlying repo stays.
+            </small>
+          </p>
+          <button
+            disabled={deleteAddon.isPending}
+            onClick={() => {
+              if (confirm(`Delete addon "${addon.name}"?`)) {
+                deleteAddon.mutate(addon.id, {
+                  onSuccess: () => navigate("/"),
+                })
+              }
+            }}
+          >
+            {deleteAddon.isPending ? "Deleting…" : "Delete addon"}
+          </button>
+          {deleteAddon.isError && (
+            <p>Delete failed: {deleteAddon.error.message}</p>
+          )}
+        </section>
       )}
     </>
   )

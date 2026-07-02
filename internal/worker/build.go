@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -22,6 +24,7 @@ type SyncJob struct {
 	Name          string
 	GitURL        string
 	DefaultBranch string
+	Subpath       string
 	Trigger       string
 	IntegrationID *uuid.UUID
 }
@@ -46,7 +49,7 @@ func NewQueue(versionRepo *repository.AddonVersionRepository, integrationRepo *r
 }
 
 func (q *Queue) Start(ctx context.Context, workers int) {
-	for i := 0; i < workers; i++ {
+	for i := range workers {
 		q.wg.Add(1)
 		go q.run(ctx, i)
 	}
@@ -97,7 +100,7 @@ func (q *Queue) process(ctx context.Context, workerID int, job SyncJob) {
 		return
 	}
 
-	desired := planVersions(refs, job.DefaultBranch)
+	desired := planVersions(refs)
 	if len(desired) == 0 {
 		log.Info("no buildable refs")
 		return
@@ -110,14 +113,19 @@ func (q *Queue) process(ctx context.Context, workerID int, job SyncJob) {
 	}
 }
 
-func planVersions(refs []git.Ref, defaultBranch string) []desiredVersion {
+func planVersions(refs []git.Ref) []desiredVersion {
 	var out []desiredVersion
 	for _, r := range refs {
-		if r.Type == git.RefTag {
-			out = append(out, desiredVersion{Version: r.Name, Ref: r})
-		}
-		if r.Type == git.RefBranch && r.Name == defaultBranch {
-			out = append(out, desiredVersion{Version: "latest", Ref: r})
+		switch r.Type {
+		case git.RefTag:
+			v, ok := normalizeVersion(r.Name)
+			if !ok {
+				slog.Warn("skipping non-version tag", "tag", r.Name)
+				continue
+			}
+			out = append(out, desiredVersion{Version: v, Ref: r})
+		case git.RefBranch:
+			out = append(out, desiredVersion{Version: "dev-" + r.Name, Ref: r})
 		}
 	}
 	return out
@@ -133,13 +141,20 @@ func (q *Queue) buildVersion(ctx context.Context, job SyncJob, cloneURL string, 
 	if err != nil && !errors.Is(err, repository.ErrNotFound) {
 		return fmt.Errorf("lookup existing: %w", err)
 	}
-	if existing != nil && existing.Status == models.StatusReady && existing.RefValue == d.Ref.SHA {
-		rc, err := q.storage.Get(ctx, existing.StorageKey)
-		if err == nil {
-			rc.Close()
+	if existing != nil {
+		if refType == models.RefTypeTag && existing.Status == models.StatusReady && existing.RefValue != d.Ref.SHA {
+			slog.Warn("tag moved after publish, keeping immutable version",
+				"addon", job.Name, "version", d.Version,
+				"published_sha", existing.RefValue, "new_sha", d.Ref.SHA)
 			return nil
 		}
-		slog.Warn("storage object missing, rebuilding", "addon", job.Name, "version", d.Version, "storage_key", existing.StorageKey)
+		if existing.Status == models.StatusReady && existing.RefValue == d.Ref.SHA {
+			if rc, err := q.storage.Get(ctx, existing.StorageKey); err == nil {
+				rc.Close()
+				return nil
+			}
+			slog.Warn("artifact missing, rebuilding", "addon", job.Name, "version", d.Version, "storage_key", existing.StorageKey)
+		}
 	}
 
 	av := &models.AddonVersion{
@@ -153,34 +168,54 @@ func (q *Queue) buildVersion(ctx context.Context, job SyncJob, cloneURL string, 
 		return fmt.Errorf("mark building: %w", err)
 	}
 
-	rootDir := sanitize(job.Name) + "-" + sanitize(d.Version)
-	archive, err := git.CloneAndZip(cloneURL, d.Ref.Name, rootDir)
+	rootDir := moduleDir(job.Name, job.Subpath)
+	archive, err := git.CloneAndZip(cloneURL, d.Ref.Name, rootDir, job.Subpath)
 	if err != nil {
-		_ = q.versionRepo.UpdateStatus(av.ID, models.StatusFailed, err.Error())
+		_ = q.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
 		return err
 	}
 	defer os.Remove(archive.ZipPath)
 
 	f, err := os.Open(archive.ZipPath)
 	if err != nil {
-		_ = q.versionRepo.UpdateStatus(av.ID, models.StatusFailed, err.Error())
+		_ = q.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
 		return err
 	}
 	defer f.Close()
 
-	key := fmt.Sprintf("packages/%s/%s.zip", job.AddonID, sanitize(d.Version))
+	keyName := strings.ReplaceAll(d.Version+"-"+d.Ref.SHA, "/", "-")
+	key := fmt.Sprintf("packages/%s/%s.zip", job.AddonID, keyName)
 	if err := q.storage.Put(ctx, key, f, storage.PutOptions{ContentType: "application/zip"}); err != nil {
-		_ = q.versionRepo.UpdateStatus(av.ID, models.StatusFailed, err.Error())
+		_ = q.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
 		return err
 	}
 
 	if err := q.versionRepo.SetReady(av.ID, key, "sha256:"+archive.ContentHash, archive.SizeBytes); err != nil {
 		return fmt.Errorf("mark ready: %w", err)
 	}
-	slog.Info("built", "addon", job.Name, "version", d.Version, "bytes", archive.SizeBytes)
+	slog.Info("built", "addon", job.Name, "version", d.Version, "ref", d.Ref.SHA, "bytes", archive.SizeBytes)
 	return nil
 }
 
-func sanitize(s string) string {
-	return strings.ReplaceAll(s, "/", "_")
+var versionRe = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*([-+][0-9A-Za-z.-]+)?$`)
+
+func normalizeVersion(tag string) (string, bool) {
+	v := strings.TrimSpace(tag)
+	if v != "" && (v[0] == 'v' || v[0] == 'V') {
+		v = v[1:]
+	}
+	if v == "" || !versionRe.MatchString(v) {
+		return "", false
+	}
+	return v, true
+}
+
+func moduleDir(name, subpath string) string {
+	if cleaned := strings.Trim(subpath, "/"); cleaned != "" {
+		return path.Base(cleaned)
+	}
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		return name[i+1:]
+	}
+	return name
 }

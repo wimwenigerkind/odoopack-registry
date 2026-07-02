@@ -4,6 +4,9 @@ export const queryKeys = {
   addons: () => ["addons"] as const,
   addon: (id: string) => ["addons", id] as const,
 
+  myRepos: () => ["me", "repos"] as const,
+  repo: (id: string) => ["repos", id] as const,
+
   users: () => ["admin", "users"] as const,
   groups: () => ["admin", "groups"] as const,
   group: (id: string) => ["admin", "groups", id] as const,

@@ -31,15 +31,12 @@ const (
 
 type Addon struct {
 	Base
-	Name          string            `gorm:"uniqueIndex;not null" json:"name"`
-	GitURL        string            `gorm:"not null" json:"git_url"`
-	DefaultBranch string            `gorm:"default:main" json:"default_branch"`
-	Visibility    Visibility        `gorm:"not null;default:public" json:"visibility"`
-	OwnerID       uuid.UUID         `gorm:"type:uuid;not null;index" json:"owner_id"`
-	Owner         *User             `json:"owner,omitempty"`
-	IntegrationID *uuid.UUID        `gorm:"type:uuid;index" json:"integration_id,omitempty"`
-	Integration   *OAuthIntegration `gorm:"foreignKey:IntegrationID" json:"integration,omitempty"`
-	Versions      []AddonVersion    `json:"versions,omitempty"`
+	Name       string         `gorm:"uniqueIndex;not null" json:"name"`
+	RepoID     uuid.UUID      `gorm:"type:uuid;not null;index" json:"repo_id"`
+	Repo       *Repo          `json:"repo,omitempty"`
+	Subpath    string         `json:"subpath,omitempty"`
+	Visibility Visibility     `gorm:"not null;default:public" json:"visibility"`
+	Versions   []AddonVersion `json:"versions,omitempty"`
 }
 
 type AddonVersion struct {

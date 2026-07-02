@@ -410,6 +410,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		internalError(c, "get user", err)
 		return
 	}
+	user.GravatarHash = hashEmailForGravatar(user.Email)
 	c.JSON(http.StatusOK, user)
 }
 
