@@ -274,7 +274,11 @@ function IntegrationRow({
       </td>
       <td>
         <code>{i.hook_secret}</code>{" "}
-        <button type="button" onClick={() => navigator.clipboard?.writeText(i.hook_secret)}>
+        <button
+          type="button"
+          disabled={!i.hook_secret}
+          onClick={() => i.hook_secret && navigator.clipboard?.writeText(i.hook_secret)}
+        >
           Copy
         </button>
       </td>
