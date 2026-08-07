@@ -132,6 +132,7 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, re
 		api.PUT("/addons/:id", requireAuth, addons.Update)
 		api.DELETE("/addons/:id", requireAuth, addons.Delete)
 		api.GET("/addons/:id/versions/:version/download", optionalAuth, downloads.Zipball)
+		api.GET("/addons/:id/versions/:version/readme", optionalAuth, addons.Readme)
 		api.DELETE("/addons/:id/versions/:version", requireAuth, addons.DeleteVersion)
 		api.POST("/addons/:id/sync", requireAuth, triggers.Sync)
 

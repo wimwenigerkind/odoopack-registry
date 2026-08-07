@@ -52,3 +52,9 @@ type AddonVersion struct {
 	BuildError  string        `json:"build_error,omitempty"`
 	BuiltAt     *time.Time    `json:"built_at,omitempty"`
 }
+
+type AddonVersionReadme struct {
+	AddonVersionID uuid.UUID `gorm:"type:uuid;primaryKey" json:"-"`
+	HTML           string    `gorm:"type:text" json:"html"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}

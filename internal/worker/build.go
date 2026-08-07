@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
 	"github.com/wimwenigerkind/odoopack-registry/internal/git"
+	"github.com/wimwenigerkind/odoopack-registry/internal/markdown"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
@@ -193,6 +194,14 @@ func (q *Queue) buildVersion(ctx context.Context, job SyncJob, cloneURL string, 
 	if err := q.versionRepo.SetReady(av.ID, key, "sha256:"+archive.ContentHash, archive.SizeBytes); err != nil {
 		return fmt.Errorf("mark ready: %w", err)
 	}
+
+	html, err := markdown.Render(archive.Readme)
+	if err != nil {
+		slog.Warn("render readme", "addon", job.Name, "version", d.Version, "err", err)
+	} else if err := q.versionRepo.SetReadme(av.ID, html); err != nil {
+		slog.Warn("store readme", "addon", job.Name, "version", d.Version, "err", err)
+	}
+
 	slog.Info("built", "addon", job.Name, "version", d.Version, "ref", d.Ref.SHA, "bytes", archive.SizeBytes)
 	return nil
 }

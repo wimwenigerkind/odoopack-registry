@@ -3,6 +3,8 @@ export const queryKeys = {
   providers: () => ["auth", "providers"] as const,
   addons: () => ["addons"] as const,
   addon: (id: string) => ["addons", id] as const,
+  addonReadme: (id: string, version: string) =>
+    ["addons", id, "readme", version] as const,
 
   myRepos: () => ["me", "repos"] as const,
   repo: (id: string) => ["repos", id] as const,

@@ -1,11 +1,13 @@
+import { useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
 import { useAddon } from "@/hooks/addons/use-addon"
+import { useAddonReadme } from "@/hooks/addons/use-addon-readme"
 import { useMe } from "@/hooks/auth/use-me"
 import { useSyncAddon } from "@/hooks/addons/use-sync-addon"
 import { useDeleteVersion } from "@/hooks/addons/use-delete-version"
 import { useDeleteAddon } from "@/hooks/addons/use-delete-addon"
 import { Avatar } from "@/components/avatar"
-import type { VersionStatus } from "@/lib/types"
+import type { AddonVersion, VersionStatus } from "@/lib/types"
 
 export default function AddonDetailPage() {
   const { id = "" } = useParams()
@@ -32,6 +34,8 @@ export default function AddonDetailPage() {
       <h2>{addon.name}</h2>
 
       <InstallSnippet name={addon.name} />
+
+      <ReadmeSection addonId={addon.id} versions={versions} />
 
       <dl>
         <dt>Owner</dt>
@@ -166,6 +170,58 @@ export default function AddonDetailPage() {
       )}
     </>
   )
+}
+
+function ReadmeSection({
+  addonId,
+  versions,
+}: {
+  addonId: string
+  versions: AddonVersion[]
+}) {
+  const readable = useMemo(() => latestFirst(versions), [versions])
+  const [selected, setSelected] = useState<string>("")
+  const version = selected || readable[0]?.version || ""
+  const { data, isLoading, isError } = useAddonReadme(addonId, version)
+
+  if (readable.length === 0) return null
+
+  return (
+    <section>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <h3 style={{ margin: 0 }}>README</h3>
+        <select value={version} onChange={(e) => setSelected(e.target.value)}>
+          {readable.map((v) => (
+            <option key={v.id} value={v.version}>
+              {v.version}
+            </option>
+          ))}
+        </select>
+      </div>
+      {isLoading ? (
+        <p>Loading README…</p>
+      ) : isError ? (
+        <p>Could not load README</p>
+      ) : !data ? (
+        <p>No README for this version.</p>
+      ) : (
+        <div
+          className="readme"
+          dangerouslySetInnerHTML={{ __html: data.html }}
+        />
+      )}
+    </section>
+  )
+}
+
+function latestFirst(versions: AddonVersion[]): AddonVersion[] {
+  return versions
+    .filter((v) => v.status === "ready")
+    .sort((a, b) => {
+      const ta = a.built_at ? Date.parse(a.built_at) : 0
+      const tb = b.built_at ? Date.parse(b.built_at) : 0
+      return tb - ta
+    })
 }
 
 function InstallSnippet({ name }: { name: string }) {

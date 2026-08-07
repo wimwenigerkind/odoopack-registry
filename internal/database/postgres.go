@@ -29,6 +29,7 @@ func Migrate(db *gorm.DB) error {
 		&models.Repo{},
 		&models.Addon{},
 		&models.AddonVersion{},
+		&models.AddonVersionReadme{},
 		&models.Group{},
 		&models.GroupMembership{},
 		&models.GroupAddonAccess{},

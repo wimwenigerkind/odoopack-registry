@@ -16,6 +16,7 @@ type ArchiveResult struct {
 	ZipPath     string
 	ContentHash string
 	SizeBytes   int64
+	Readme      string
 }
 
 func CloneAndZip(url, ref, rootDir, subpath string) (ArchiveResult, error) {
@@ -74,6 +75,7 @@ func CloneAndZip(url, ref, rootDir, subpath string) (ArchiveResult, error) {
 		ZipPath:     outName,
 		ContentHash: hash,
 		SizeBytes:   info.Size(),
+		Readme:      readReadme(src, subpath),
 	}, nil
 }
 
@@ -143,7 +145,32 @@ func CloneAndZipAtSHA(url, sha, rootDir, subpath string) (ArchiveResult, error) 
 		ZipPath:     outName,
 		ContentHash: hash,
 		SizeBytes:   info.Size(),
+		Readme:      readReadme(src, subpath),
 	}, nil
+}
+
+func readReadme(srcDir, subpath string) string {
+	dir := srcDir
+	if cleaned := strings.Trim(subpath, "/"); cleaned != "" {
+		dir = filepath.Join(srcDir, cleaned)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if strings.EqualFold(e.Name(), "README.md") {
+			data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+			if err != nil {
+				return ""
+			}
+			return string(data)
+		}
+	}
+	return ""
 }
 
 func runGit(workdir string, args ...string) error {

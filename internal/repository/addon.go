@@ -67,6 +67,10 @@ func (r *AddonRepository) Delete(id uuid.UUID) error {
 		if err := tx.Where("addon_id = ?", id).Delete(&models.GroupAddonAccess{}).Error; err != nil {
 			return err
 		}
+		versionIDs := tx.Model(&models.AddonVersion{}).Select("id").Where("addon_id = ?", id)
+		if err := tx.Where("addon_version_id IN (?)", versionIDs).Delete(&models.AddonVersionReadme{}).Error; err != nil {
+			return err
+		}
 		if err := tx.Where("addon_id = ?", id).Delete(&models.AddonVersion{}).Error; err != nil {
 			return err
 		}

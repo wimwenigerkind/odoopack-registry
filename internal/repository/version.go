@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type AddonVersionRepository struct {
@@ -62,14 +63,46 @@ func (r *AddonVersionRepository) UpdateStatus(id uuid.UUID, status models.Versio
 }
 
 func (r *AddonVersionRepository) Delete(id uuid.UUID) error {
-	res := r.db.Where("id = ?", id).Delete(&models.AddonVersion{})
-	if res.Error != nil {
-		return res.Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("addon_version_id = ?", id).Delete(&models.AddonVersionReadme{}).Error; err != nil {
+			return err
+		}
+		res := tx.Where("id = ?", id).Delete(&models.AddonVersion{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrNotFound
+		}
+		return nil
+	})
+}
+
+func (r *AddonVersionRepository) SetReadme(versionID uuid.UUID, html string) error {
+	if html == "" {
+		return r.db.Where("addon_version_id = ?", versionID).Delete(&models.AddonVersionReadme{}).Error
 	}
-	if res.RowsAffected == 0 {
-		return ErrNotFound
+	readme := &models.AddonVersionReadme{
+		AddonVersionID: versionID,
+		HTML:           html,
+		UpdatedAt:      time.Now(),
 	}
-	return nil
+	return r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "addon_version_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"html", "updated_at"}),
+	}).Create(readme).Error
+}
+
+func (r *AddonVersionRepository) GetReadme(versionID uuid.UUID) (*models.AddonVersionReadme, error) {
+	var readme models.AddonVersionReadme
+	err := r.db.Where("addon_version_id = ?", versionID).First(&readme).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &readme, nil
 }
 
 func (r *AddonVersionRepository) SetReady(id uuid.UUID, storageKey, contentHash string, sizeBytes int64) error {

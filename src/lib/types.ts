@@ -98,6 +98,11 @@ export interface AddonVersion {
   built_at?: string | null
 }
 
+export interface ReadmeResponse {
+  html: string
+  updated_at: string
+}
+
 export interface Repo {
   id: string
   created_at: string

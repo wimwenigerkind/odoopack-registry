@@ -278,6 +278,50 @@ func (h *AddonHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, addon)
 }
 
+func (h *AddonHandler) Readme(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	version := c.Param("version")
+
+	addon, err := h.addons.GetByID(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+	if !canReadAddon(c, addon, h.groups, h.users, h.mode) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
+		return
+	}
+
+	av, err := h.versions.Get(addon.ID, version)
+	if errors.Is(err, repository.ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "version not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+
+	readme, err := h.versions.GetReadme(av.ID)
+	if errors.Is(err, repository.ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no readme for this version"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+	c.JSON(http.StatusOK, readme)
+}
+
 func generateSecret(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
