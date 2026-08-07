@@ -51,6 +51,20 @@ func LoadProviders(ctx context.Context, baseURL string) (map[string]Provider, er
 				ClientSecret:        viper.GetString("auth." + name + ".client_secret"),
 			}
 			out[name] = NewBitbucketProvider(name, bc, callback)
+		case string(ProviderTypeForgejo):
+			fc := ForgejoConfig{
+				AllowLogin:          viper.GetBool("auth." + name + ".allow_login"),
+				AllowRegister:       viper.GetBool("auth." + name + ".allow_register"),
+				AllowGitIntegration: viper.GetBool("auth." + name + ".allow_git_integration"),
+				BaseURL:             viper.GetString("auth." + name + ".base_url"),
+				ClientID:            viper.GetString("auth." + name + ".client_id"),
+				ClientSecret:        viper.GetString("auth." + name + ".client_secret"),
+			}
+			p, err := NewForgejoProvider(name, fc, callback)
+			if err != nil {
+				return nil, fmt.Errorf("auth.%s: %w", name, err)
+			}
+			out[name] = p
 		case string(ProviderTypeEntra):
 			ec := EntraConfig{
 				AllowLogin:    viper.GetBool("auth." + name + ".allow_login"),
