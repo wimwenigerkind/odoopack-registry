@@ -1,13 +1,42 @@
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  Download,
+  FileText,
+  Package,
+  Pencil,
+  RefreshCw,
+  Trash2,
+} from "lucide-react"
 import { useMemo, useState } from "react"
+import type { ReactNode } from "react"
 import { Link, useNavigate, useParams } from "react-router"
+import { Avatar } from "@/components/avatar"
+import {
+  Badge,
+  Button,
+  buttonVariants,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  Select,
+  Spinner,
+  StatusBadge,
+  Table,
+  TBody,
+  TD,
+  TH,
+  THead,
+  TR,
+} from "@/components/ui"
 import { useAddon } from "@/hooks/addons/use-addon"
 import { useAddonReadme } from "@/hooks/addons/use-addon-readme"
-import { useMe } from "@/hooks/auth/use-me"
-import { useSyncAddon } from "@/hooks/addons/use-sync-addon"
-import { useDeleteVersion } from "@/hooks/addons/use-delete-version"
 import { useDeleteAddon } from "@/hooks/addons/use-delete-addon"
-import { Avatar } from "@/components/avatar"
-import type { AddonVersion, VersionStatus } from "@/lib/types"
+import { useDeleteVersion } from "@/hooks/addons/use-delete-version"
+import { useSyncAddon } from "@/hooks/addons/use-sync-addon"
+import { useMe } from "@/hooks/auth/use-me"
+import type { AddonVersion } from "@/lib/types"
 
 export default function AddonDetailPage() {
   const { id = "" } = useParams()
@@ -18,157 +47,270 @@ export default function AddonDetailPage() {
   const deleteAddon = useDeleteAddon()
   const navigate = useNavigate()
 
-  if (isLoading) return <p>Loading…</p>
-  if (isError) return <p>Could not load addon</p>
-  if (!addon) return <p>Addon not found</p>
+  if (isLoading)
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner className="size-6" />
+      </div>
+    )
+  if (isError) return <p className="text-danger">Could not load addon.</p>
+  if (!addon) return <p>Addon not found.</p>
 
   const isOwner = user?.id === addon.repo?.owner_id
   const versions = addon.versions ?? []
+  const integration = addon.repo?.integration
 
   return (
-    <>
-      <p>
-        <Link to="/">Back</Link>
-      </p>
+    <div className="flex flex-col gap-6">
+      <Link
+        to="/"
+        className="inline-flex w-fit items-center gap-1 text-sm text-muted transition-colors hover:text-fg"
+      >
+        <ArrowLeft className="size-4" />
+        Back
+      </Link>
 
-      <h2>{addon.name}</h2>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold">{addon.name}</h1>
+            <Badge
+              variant={addon.visibility === "public" ? "neutral" : "warning"}
+            >
+              {addon.visibility}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted">
+            <Avatar hash={addon.repo?.owner?.gravatar_hash} size={20} />
+            {addon.repo?.owner?.username ?? "-"}
+          </div>
+        </div>
+        {isOwner && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              loading={sync.isPending}
+              onClick={() => sync.mutate()}
+            >
+              {!sync.isPending && <RefreshCw className="size-4" />}
+              Sync
+            </Button>
+            <Link
+              to={`/addons/${addon.id}/edit`}
+              className={buttonVariants({ variant: "secondary" })}
+            >
+              <Pencil className="size-4" />
+              Edit
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {isOwner && sync.isSuccess && (
+        <p className="text-sm text-success">Sync queued.</p>
+      )}
+      {isOwner && sync.isError && (
+        <p className="text-sm text-danger">Sync failed.</p>
+      )}
 
       <InstallSnippet name={addon.name} />
 
       <ReadmeSection addonId={addon.id} versions={versions} />
 
-      <dl>
-        <dt>Owner</dt>
-        <dd style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <Avatar hash={addon.repo?.owner?.gravatar_hash} size={24} />
-          {addon.repo?.owner?.username ?? "-"}
-        </dd>
-        <dt>Visibility</dt>
-        <dd>{addon.visibility}</dd>
-        <dt>Repo</dt>
-        <dd>
-          {addon.repo ? (
-            <Link to={`/repos/${addon.repo.id}`}>
-              <code>{addon.repo.git_url}</code>
-            </Link>
-          ) : (
-            "-"
-          )}
-        </dd>
-        <dt>Subpath</dt>
-        <dd>{addon.subpath ? <code>{addon.subpath}</code> : "(repo root)"}</dd>
-        <dt>Default branch</dt>
-        <dd>{addon.repo?.default_branch ?? "-"}</dd>
-        <dt>Integration</dt>
-        <dd>
-          {addon.repo?.integration
-            ? `${addon.repo.integration.provider}${addon.repo.integration.account_name ? ` (${addon.repo.integration.account_name})` : ""}`
-            : "none (anonymous clone)"}
-        </dd>
-      </dl>
+      <Card className="p-5">
+        <dl className="grid grid-cols-1 gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
+          <Detail label="Repository">
+            {addon.repo ? (
+              <Link
+                to={`/repos/${addon.repo.id}`}
+                className="break-all text-accent"
+              >
+                <code>{addon.repo.git_url}</code>
+              </Link>
+            ) : (
+              "-"
+            )}
+          </Detail>
+          <Detail label="Subpath">
+            {addon.subpath ? (
+              <code>{addon.subpath}</code>
+            ) : (
+              <span className="text-muted">(repo root)</span>
+            )}
+          </Detail>
+          <Detail label="Default branch">
+            <code>{addon.repo?.default_branch ?? "-"}</code>
+          </Detail>
+          <Detail label="Integration">
+            {integration ? (
+              <span>
+                {integration.provider}
+                {integration.account_name
+                  ? ` (${integration.account_name})`
+                  : ""}
+              </span>
+            ) : (
+              <span className="text-muted">none (anonymous clone)</span>
+            )}
+          </Detail>
+        </dl>
+      </Card>
 
-      {isOwner && (
-        <section>
-          <button onClick={() => sync.mutate()} disabled={sync.isPending}>
-            {sync.isPending ? "Syncing…" : "Sync now"}
-          </button>
-          {" "}
-          <Link to={`/addons/${addon.id}/edit`}>Edit</Link>
-          {sync.isError && <p>Sync failed</p>}
-          {sync.isSuccess && <p>Sync queued</p>}
-        </section>
-      )}
-
-      <h3>Versions ({versions.length})</h3>
-      {versions.length === 0 ? (
-        <p>No versions yet. Sync the addon to discover tags and branches.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Version</th>
-              <th>Ref</th>
-              <th>Status</th>
-              <th>Size</th>
-              <th>Built</th>
-              <th>Download</th>
-              {isOwner && <th></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {versions.map((v) => (
-              <tr key={v.id}>
-                <td>{v.version}</td>
-                <td>
-                  <small>
-                    {v.ref_type}: <code>{v.ref_value.slice(0, 8)}</code>
-                  </small>
-                </td>
-                <td>
-                  <StatusBadge status={v.status} />
-                </td>
-                <td>{formatSize(v.size_bytes)}</td>
-                <td>
-                  {v.built_at ? new Date(v.built_at).toLocaleString() : "-"}
-                </td>
-                <td>
-                  {v.status === "ready" ? (
-                    <a
-                      href={`/api/v1/addons/${addon.id}/versions/${encodeURIComponent(v.version)}/download`}
-                    >
-                      Download
-                    </a>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                {isOwner && (
-                  <td>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Delete version "${v.version}"?`)) {
-                          deleteVersion.mutate(v.version)
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">
+          Versions{" "}
+          <span className="font-normal text-muted">({versions.length})</span>
+        </h2>
+        {versions.length === 0 ? (
+          <EmptyState
+            icon={Package}
+            title="No versions yet"
+            description="Sync the addon to discover tags and branches."
+          />
+        ) : (
+          <Table>
+            <THead>
+              <TR>
+                <TH>Version</TH>
+                <TH>Ref</TH>
+                <TH>Status</TH>
+                <TH>Size</TH>
+                <TH>Built</TH>
+                <TH></TH>
+                {isOwner && <TH></TH>}
+              </TR>
+            </THead>
+            <TBody>
+              {versions.map((v) => (
+                <TR key={v.id}>
+                  <TD className="font-medium">{v.version}</TD>
+                  <TD className="text-muted">
+                    <span className="text-xs">{v.ref_type}</span>{" "}
+                    <code className="text-xs">{v.ref_value.slice(0, 8)}</code>
+                  </TD>
+                  <TD>
+                    <StatusBadge status={v.status} />
+                  </TD>
+                  <TD className="text-muted">{formatSize(v.size_bytes)}</TD>
+                  <TD className="text-muted">
+                    {v.built_at
+                      ? new Date(v.built_at).toLocaleDateString()
+                      : "-"}
+                  </TD>
+                  <TD>
+                    {v.status === "ready" ? (
+                      <a
+                        href={`/api/v1/addons/${addon.id}/versions/${encodeURIComponent(v.version)}/download`}
+                        className="inline-flex items-center gap-1 text-accent"
+                      >
+                        <Download className="size-4" />
+                        Download
+                      </a>
+                    ) : (
+                      <span className="text-muted">-</span>
+                    )}
+                  </TD>
+                  {isOwner && (
+                    <TD className="text-right">
+                      <ConfirmDialog
+                        trigger={
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`Delete version ${v.version}`}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
                         }
-                      }}
-                      disabled={deleteVersion.isPending}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+                        title={`Delete version ${v.version}?`}
+                        description="This removes the version and its built zipball."
+                        confirmLabel="Delete"
+                        destructive
+                        loading={deleteVersion.isPending}
+                        onConfirm={() => deleteVersion.mutate(v.version)}
+                      />
+                    </TD>
+                  )}
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        )}
+      </section>
 
       {isOwner && (
-        <section>
-          <h3>Danger zone</h3>
-          <p>
-            <small>
-              Removes the addon, all its versions, and built zipballs. The
-              underlying repo stays.
-            </small>
+        <Card className="border-danger/30 p-5">
+          <h2 className="text-base font-semibold text-danger">Danger zone</h2>
+          <p className="mt-1 text-sm text-muted">
+            Removes the addon, all its versions, and built zipballs. The
+            underlying repo stays.
           </p>
-          <button
-            disabled={deleteAddon.isPending}
-            onClick={() => {
-              if (confirm(`Delete addon "${addon.name}"?`)) {
+          <div className="mt-4">
+            <ConfirmDialog
+              trigger={
+                <Button variant="danger" loading={deleteAddon.isPending}>
+                  <Trash2 className="size-4" />
+                  Delete addon
+                </Button>
+              }
+              title={`Delete addon ${addon.name}?`}
+              description="This cannot be undone."
+              confirmLabel="Delete addon"
+              destructive
+              loading={deleteAddon.isPending}
+              onConfirm={() =>
                 deleteAddon.mutate(addon.id, {
                   onSuccess: () => navigate("/"),
                 })
               }
-            }}
-          >
-            {deleteAddon.isPending ? "Deleting…" : "Delete addon"}
-          </button>
+            />
+          </div>
           {deleteAddon.isError && (
-            <p>Delete failed: {deleteAddon.error.message}</p>
+            <p className="mt-2 text-sm text-danger">
+              Delete failed: {deleteAddon.error.message}
+            </p>
           )}
-        </section>
+        </Card>
       )}
-    </>
+    </div>
+  )
+}
+
+function Detail({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+        {label}
+      </dt>
+      <dd>{children}</dd>
+    </div>
+  )
+}
+
+function InstallSnippet({ name }: { name: string }) {
+  const cmd = `odoopack add ${name}`
+  const [copied, setCopied] = useState(false)
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 font-mono text-sm">
+      <span className="select-none text-muted">$</span>
+      <code className="flex-1 truncate">{cmd}</code>
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-label="Copy install command"
+        onClick={() => {
+          navigator.clipboard?.writeText(cmd)
+          setCopied(true)
+          window.setTimeout(() => setCopied(false), 1500)
+        }}
+      >
+        {copied ? (
+          <Check className="size-4 text-success" />
+        ) : (
+          <Copy className="size-4" />
+        )}
+      </Button>
+    </div>
   )
 }
 
@@ -180,37 +322,48 @@ function ReadmeSection({
   versions: AddonVersion[]
 }) {
   const readable = useMemo(() => latestFirst(versions), [versions])
-  const [selected, setSelected] = useState<string>("")
+  const [selected, setSelected] = useState("")
   const version = selected || readable[0]?.version || ""
   const { data, isLoading, isError } = useAddonReadme(addonId, version)
 
   if (readable.length === 0) return null
 
   return (
-    <section>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <h3 style={{ margin: 0 }}>README</h3>
-        <select value={version} onChange={(e) => setSelected(e.target.value)}>
+    <Card>
+      <div className="flex items-center justify-between gap-3 border-b border-border p-4">
+        <div className="flex items-center gap-2 font-medium">
+          <FileText className="size-4 text-muted" />
+          README
+        </div>
+        <Select
+          value={version}
+          onChange={(e) => setSelected(e.target.value)}
+          className="h-8 w-auto py-1 text-sm"
+        >
           {readable.map((v) => (
             <option key={v.id} value={v.version}>
               {v.version}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
-      {isLoading ? (
-        <p>Loading README…</p>
-      ) : isError ? (
-        <p>Could not load README</p>
-      ) : !data ? (
-        <p>No README for this version.</p>
-      ) : (
-        <div
-          className="readme"
-          dangerouslySetInnerHTML={{ __html: data.html }}
-        />
-      )}
-    </section>
+      <div className="p-5">
+        {isLoading ? (
+          <div className="flex justify-center py-6">
+            <Spinner />
+          </div>
+        ) : isError ? (
+          <p className="text-sm text-danger">Could not load README.</p>
+        ) : !data ? (
+          <p className="text-sm text-muted">No README for this version.</p>
+        ) : (
+          <div
+            className="prose prose-sm max-w-none dark:prose-invert"
+            dangerouslySetInnerHTML={{ __html: data.html }}
+          />
+        )}
+      </div>
+    </Card>
   )
 }
 
@@ -222,25 +375,6 @@ function latestFirst(versions: AddonVersion[]): AddonVersion[] {
       const tb = b.built_at ? Date.parse(b.built_at) : 0
       return tb - ta
     })
-}
-
-function InstallSnippet({ name }: { name: string }) {
-  const cmd = `odoopack add ${name}`
-  return (
-    <p>
-      <code>{cmd}</code>{" "}
-      <button
-        type="button"
-        onClick={() => navigator.clipboard?.writeText(cmd)}
-      >
-        Copy
-      </button>
-    </p>
-  )
-}
-
-function StatusBadge({ status }: { status: VersionStatus }) {
-  return <span data-status={status}>{status}</span>
 }
 
 function formatSize(bytes?: number): string {
