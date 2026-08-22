@@ -23,7 +23,7 @@ function SearchBar() {
   const [value, setValue] = useState(params.get("q") ?? "")
   return (
     <form
-      className="relative flex-1"
+      className="relative min-w-0 flex-1"
       onSubmit={(e) => {
         e.preventDefault()
         navigate(value ? `/?q=${encodeURIComponent(value)}` : "/")

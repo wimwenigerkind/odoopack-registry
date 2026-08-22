@@ -20,6 +20,7 @@ import {
   CopyButton,
   EmptyState,
   Select,
+  Skeleton,
   Spinner,
   StatusBadge,
   Table,
@@ -46,12 +47,7 @@ export default function AddonDetailPage() {
   const deleteAddon = useDeleteAddon()
   const navigate = useNavigate()
 
-  if (isLoading)
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner className="size-6" />
-      </div>
-    )
+  if (isLoading) return <DetailSkeleton />
   if (isError) return <p className="text-danger">Could not load addon.</p>
   if (!addon) return <p>Addon not found.</p>
 
@@ -351,6 +347,21 @@ function latestFirst(versions: AddonVersion[]): AddonVersion[] {
       const tb = b.built_at ? Date.parse(b.built_at) : 0
       return tb - ta
     })
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <Skeleton className="h-4 w-16" />
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-40" />
+      </div>
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-48 w-full rounded-xl" />
+      <Skeleton className="h-32 w-full rounded-xl" />
+    </div>
+  )
 }
 
 function formatSize(bytes?: number): string {

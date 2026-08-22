@@ -1,6 +1,6 @@
 import { Package, Plus } from "lucide-react"
 import { Link, useSearchParams } from "react-router"
-import { Badge, buttonVariants, Card, EmptyState } from "@/components/ui"
+import { Badge, buttonVariants, Card, EmptyState, Skeleton } from "@/components/ui"
 import { useAddons } from "@/hooks/addons/use-addons"
 import { useMe } from "@/hooks/auth/use-me"
 import type { Addon } from "@/lib/types"
@@ -19,7 +19,7 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Addons</h1>
           <p className="text-sm text-muted">Browse and install Odoo addons.</p>
@@ -96,10 +96,7 @@ function LoadingGrid() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div
-          key={i}
-          className="h-28 animate-pulse rounded-xl border border-border bg-surface"
-        />
+        <Skeleton key={i} className="h-28 rounded-xl" />
       ))}
     </div>
   )

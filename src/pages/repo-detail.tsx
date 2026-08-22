@@ -13,7 +13,7 @@ import {
   Field,
   Input,
   Select,
-  Spinner,
+  Skeleton,
   Table,
   TBody,
   TD,
@@ -34,12 +34,7 @@ export default function RepoDetailPage() {
   const { data: user } = useMe()
   const navigate = useNavigate()
 
-  if (isLoading)
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner className="size-6" />
-      </div>
-    )
+  if (isLoading) return <RepoSkeleton />
   if (isError) return <p className="text-danger">Could not load repo.</p>
   if (!repo) return <p>Repo not found.</p>
 
@@ -161,6 +156,17 @@ export default function RepoDetailPage() {
           onDeleted={() => navigate("/profile")}
         />
       )}
+    </div>
+  )
+}
+
+function RepoSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <Skeleton className="h-4 w-16" />
+      <Skeleton className="h-8 w-40" />
+      <Skeleton className="h-32 w-full rounded-xl" />
+      <Skeleton className="h-40 w-full rounded-xl" />
     </div>
   )
 }
