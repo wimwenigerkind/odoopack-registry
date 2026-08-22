@@ -8,6 +8,7 @@ export function useUpdateAddon(id: string) {
   const qc = useQueryClient()
 
   return useMutation<Addon, Error, UpdateAddonRequest>({
+    meta: { successMessage: "Changes saved" },
     mutationFn: (req) =>
       api<Addon>(`/api/v1/addons/${id}`, {
         method: "PUT",

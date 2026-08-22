@@ -8,6 +8,7 @@ export function useUpdateRepo(id: string) {
   const qc = useQueryClient()
 
   return useMutation<Repo, Error, UpdateRepoRequest>({
+    meta: { successMessage: "Changes saved" },
     mutationFn: (req) =>
       api<Repo>(`/api/v1/repos/${id}`, {
         method: "PUT",

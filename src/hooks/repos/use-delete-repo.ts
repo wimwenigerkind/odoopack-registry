@@ -7,6 +7,7 @@ export function useDeleteRepo() {
   const qc = useQueryClient()
 
   return useMutation<void, Error, string>({
+    meta: { successMessage: "Repository deleted" },
     mutationFn: (id) =>
       api<void>(`/api/v1/repos/${id}`, {
         method: "DELETE",

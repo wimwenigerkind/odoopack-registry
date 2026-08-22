@@ -27,6 +27,7 @@ export function useDeleteIntegration() {
   const api = useApiClient()
   const qc = useQueryClient()
   return useMutation<void, Error, string>({
+    meta: { successMessage: "Integration disconnected" },
     mutationFn: (id) =>
       api<void>(`/api/v1/me/integrations/${id}`, { method: "DELETE" }),
     onSuccess: () => {

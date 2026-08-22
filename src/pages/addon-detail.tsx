@@ -105,13 +105,6 @@ export default function AddonDetailPage() {
         )}
       </div>
 
-      {isOwner && sync.isSuccess && (
-        <p className="text-sm text-success">Sync queued.</p>
-      )}
-      {isOwner && sync.isError && (
-        <p className="text-sm text-danger">Sync failed.</p>
-      )}
-
       <InstallSnippet name={addon.name} />
 
       <ReadmeSection addonId={addon.id} versions={versions} />

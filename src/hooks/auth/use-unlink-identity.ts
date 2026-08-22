@@ -7,6 +7,7 @@ export function useUnlinkIdentity() {
   const qc = useQueryClient()
 
   return useMutation<void, Error, string>({
+    meta: { successMessage: "Account unlinked" },
     mutationFn: (id) =>
       api<void>(`/api/v1/me/identities/${id}`, { method: "DELETE" }),
     onSuccess: () => {

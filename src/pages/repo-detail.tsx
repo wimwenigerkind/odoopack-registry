@@ -223,13 +223,6 @@ function RepoSettings({ repo }: { repo: Repo }) {
           </Select>
         </Field>
 
-        {update.isError && (
-          <p className="text-sm text-danger">
-            Update failed: {update.error.message}
-          </p>
-        )}
-        {update.isSuccess && <p className="text-sm text-success">Saved.</p>}
-
         <div className="flex justify-end">
           <Button type="submit" loading={update.isPending}>
             Save

@@ -9,6 +9,7 @@ interface CreateWorkspaceHookResponse {
 export function useCreateWorkspaceHook(integrationID: string) {
   const api = useApiClient()
   return useMutation<CreateWorkspaceHookResponse, Error, string>({
+    meta: { successMessage: "Workspace hook created" },
     mutationFn: (workspace) =>
       api<CreateWorkspaceHookResponse>(
         `/api/v1/me/integrations/${integrationID}/workspace-hooks`,

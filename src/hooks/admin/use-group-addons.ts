@@ -17,6 +17,7 @@ export function useGrantGroupAddon(groupID: string) {
   const api = useApiClient()
   const qc = useQueryClient()
   return useMutation<void, Error, { addon_id: string }>({
+    meta: { successMessage: "Access granted" },
     mutationFn: (req) =>
       api<void>(`/api/v1/groups/${groupID}/addons`, {
         method: "POST",
@@ -32,6 +33,7 @@ export function useRevokeGroupAddon(groupID: string) {
   const api = useApiClient()
   const qc = useQueryClient()
   return useMutation<void, Error, string>({
+    meta: { successMessage: "Access revoked" },
     mutationFn: (addonID) =>
       api<void>(`/api/v1/groups/${groupID}/addons/${addonID}`, {
         method: "DELETE",

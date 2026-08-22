@@ -7,6 +7,7 @@ export function useDeleteVersion(addonID: string) {
   const qc = useQueryClient()
 
   return useMutation<void, Error, string>({
+    meta: { successMessage: "Version deleted" },
     mutationFn: (version) =>
       api<void>(
         `/api/v1/addons/${addonID}/versions/${encodeURIComponent(version)}`,

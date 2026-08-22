@@ -15,6 +15,7 @@ export function useCreateToken() {
   const api = useApiClient()
   const qc = useQueryClient()
   return useMutation<ApiToken, Error, CreateTokenRequest>({
+    meta: { successMessage: "Token created" },
     mutationFn: (req) =>
       api<ApiToken>("/api/v1/me/tokens", {
         method: "POST",
@@ -30,6 +31,7 @@ export function useDeleteToken() {
   const api = useApiClient()
   const qc = useQueryClient()
   return useMutation<void, Error, string>({
+    meta: { successMessage: "Token revoked" },
     mutationFn: (id) =>
       api<void>(`/api/v1/me/tokens/${id}`, { method: "DELETE" }),
     onSuccess: () => {

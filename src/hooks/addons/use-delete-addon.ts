@@ -7,6 +7,7 @@ export function useDeleteAddon() {
   const qc = useQueryClient()
 
   return useMutation<void, Error, string>({
+    meta: { successMessage: "Addon deleted" },
     mutationFn: (id) =>
       api<void>(`/api/v1/addons/${id}`, {
         method: "DELETE",

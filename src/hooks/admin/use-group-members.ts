@@ -17,6 +17,7 @@ export function useAddGroupMember(groupID: string) {
   const api = useApiClient()
   const qc = useQueryClient()
   return useMutation<void, Error, { user_id: string }>({
+    meta: { successMessage: "Member added" },
     mutationFn: (req) =>
       api<void>(`/api/v1/groups/${groupID}/members`, {
         method: "POST",
@@ -32,6 +33,7 @@ export function useRemoveGroupMember(groupID: string) {
   const api = useApiClient()
   const qc = useQueryClient()
   return useMutation<void, Error, string>({
+    meta: { successMessage: "Member removed" },
     mutationFn: (userID) =>
       api<void>(`/api/v1/groups/${groupID}/members/${userID}`, {
         method: "DELETE",

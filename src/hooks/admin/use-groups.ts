@@ -15,6 +15,7 @@ export function useCreateGroup() {
   const api = useApiClient()
   const qc = useQueryClient()
   return useMutation<Group, Error, { name: string }>({
+    meta: { successMessage: "Group created" },
     mutationFn: (req) =>
       api<Group>("/api/v1/groups", {
         method: "POST",
@@ -30,6 +31,7 @@ export function useDeleteGroup() {
   const api = useApiClient()
   const qc = useQueryClient()
   return useMutation<void, Error, string>({
+    meta: { successMessage: "Group deleted" },
     mutationFn: (id) =>
       api<void>(`/api/v1/groups/${id}`, { method: "DELETE" }),
     onSuccess: () => {

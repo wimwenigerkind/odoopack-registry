@@ -7,6 +7,7 @@ export function useSyncAddon(id: string) {
   const qc = useQueryClient()
 
   return useMutation({
+    meta: { successMessage: "Sync queued" },
     mutationFn: () =>
       api<void>(`/api/v1/addons/${id}/sync`, { method: "POST" }),
     onSuccess: () => {
