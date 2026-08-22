@@ -5,6 +5,7 @@ import AddonDetailPage from "@/pages/addon-detail.tsx";
 import AddonEditPage from "@/pages/addon-edit.tsx";
 import AddonNewPage from "@/pages/addon-new.tsx";
 import RepoDetailPage from "@/pages/repo-detail.tsx";
+import LoginPage from "@/pages/login.tsx";
 import ProfilePage from "@/pages/profile.tsx";
 import AdminUsersPage from "@/pages/admin/users.tsx";
 import AdminGroupsPage from "@/pages/admin/groups.tsx";
@@ -12,6 +13,7 @@ import AdminGroupDetailPage from "@/pages/admin/group-detail.tsx";
 import { RequireAdmin } from "@/components/require-admin";
 
 const router = createBrowserRouter([
+  { path: "/login", element: <LoginPage/> },
   {
     element: <RootLayout/>,
     children: [

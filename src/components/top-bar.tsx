@@ -1,10 +1,10 @@
 import { LogOut, Package, Search, User, Users } from "lucide-react"
 import { useState } from "react"
-import { Link, useNavigate, useSearchParams } from "react-router"
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router"
 import { Avatar } from "@/components/avatar"
 import { ThemeToggle } from "@/components/theme-toggle"
 import {
-  Button,
+  buttonVariants,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -15,14 +15,7 @@ import {
   Spinner,
 } from "@/components/ui"
 import { useMe } from "@/hooks/auth/use-me"
-import { useProviders } from "@/hooks/auth/use-providers"
 import { useLogout } from "@/hooks/auth/use-logout"
-
-function loginHref(name: string) {
-  return `/auth/${name}/login?return_to=${encodeURIComponent(
-    window.location.pathname + window.location.search,
-  )}`
-}
 
 function SearchBar() {
   const [params] = useSearchParams()
@@ -93,27 +86,16 @@ function UserMenu() {
   )
 }
 
-function LoginMenu() {
-  const { data, isLoading } = useProviders()
-  const providers = data?.providers ?? []
-  if (isLoading) return <Spinner />
-  if (providers.length === 0)
-    return <span className="text-sm text-muted">No login</span>
+function SignInButton() {
+  const location = useLocation()
+  const returnTo = location.pathname + location.search
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size="sm">Sign in</Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        {providers.map((p) => (
-          <DropdownMenuItem key={p.name} asChild>
-            <a href={loginHref(p.name)} className="capitalize">
-              {p.name}
-            </a>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Link
+      to={`/login?return_to=${encodeURIComponent(returnTo)}`}
+      className={buttonVariants({ size: "sm" })}
+    >
+      Sign in
+    </Link>
   )
 }
 
@@ -131,7 +113,7 @@ export function TopBar() {
         </Link>
         <SearchBar />
         <ThemeToggle />
-        {isLoading ? <Spinner /> : user ? <UserMenu /> : <LoginMenu />}
+        {isLoading ? <Spinner /> : user ? <UserMenu /> : <SignInButton />}
       </div>
     </header>
   )
