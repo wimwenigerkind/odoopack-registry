@@ -1,57 +1,80 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react"
+import { ArrowLeft, CheckCircle2 } from "lucide-react"
+import { useState } from "react"
+import type { FormEvent } from "react"
 import { Link, useSearchParams } from "react-router"
+import {
+  Button,
+  buttonVariants,
+  Card,
+  Field,
+  Input,
+  Select,
+  Spinner,
+} from "@/components/ui"
 import { useRegisterAddon } from "@/hooks/addons/use-register-addon"
 import { useMe } from "@/hooks/auth/use-me"
 import { useIntegrations } from "@/hooks/integrations/use-integrations"
 import { useMyRepos } from "@/hooks/repos/use-my-repos"
-import type { Visibility } from "@/lib/types"
+import type { OAuthIntegration, Repo, Visibility } from "@/lib/types"
 
 type RepoMode = "existing" | "new"
 
 export default function AddonNewPage() {
   const { data: user, isLoading: meLoading } = useMe()
+  const { data: myRepos, isLoading: reposLoading } = useMyRepos()
   const { data: integrations } = useIntegrations()
-  const { data: myRepos } = useMyRepos()
-  const register = useRegisterAddon()
   const [searchParams] = useSearchParams()
 
-  const preselectedRepoID = searchParams.get("repo_id") ?? ""
+  if (meLoading || reposLoading)
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner className="size-6" />
+      </div>
+    )
+  if (!user)
+    return <p>You must be logged in to register an addon.</p>
 
-  // Repo section
-  const [repoMode, setRepoMode] = useState<RepoMode>("new")
-  const [selectedRepoID, setSelectedRepoID] = useState("")
+  return (
+    <NewAddonForm
+      repos={myRepos ?? []}
+      integrations={integrations ?? []}
+      preselectedRepoID={searchParams.get("repo_id") ?? ""}
+    />
+  )
+}
+
+function NewAddonForm({
+  repos,
+  integrations,
+  preselectedRepoID,
+}: {
+  repos: Repo[]
+  integrations: OAuthIntegration[]
+  preselectedRepoID: string
+}) {
+  const register = useRegisterAddon()
+  const hasRepos = repos.length > 0
+  const preselected = repos.some((r) => r.id === preselectedRepoID)
+    ? preselectedRepoID
+    : ""
+
+  const [repoMode, setRepoMode] = useState<RepoMode>(
+    hasRepos ? "existing" : "new",
+  )
+  const [selectedRepoID, setSelectedRepoID] = useState(
+    preselected || (hasRepos ? repos[0].id : ""),
+  )
   const [gitUrl, setGitUrl] = useState("")
   const [defaultBranch, setDefaultBranch] = useState("main")
   const [integrationID, setIntegrationID] = useState("")
-
-  // Addon section
   const [name, setName] = useState("")
   const [subpath, setSubpath] = useState("")
   const [visibility, setVisibility] = useState<Visibility>("public")
 
-  const hasRepos = (myRepos?.length ?? 0) > 0
-
-  useEffect(() => {
-    if (!myRepos) return
-    if (preselectedRepoID && myRepos.some((r) => r.id === preselectedRepoID)) {
-      setRepoMode("existing")
-      setSelectedRepoID(preselectedRepoID)
-    } else if (hasRepos && repoMode === "new" && !preselectedRepoID) {
-      // default: existing if user has any, otherwise new
-      setRepoMode("existing")
-      setSelectedRepoID(myRepos[0].id)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myRepos])
-
-  const selectedRepo = useMemo(
-    () => myRepos?.find((r) => r.id === selectedRepoID),
-    [myRepos, selectedRepoID],
-  )
+  const selectedRepo = repos.find((r) => r.id === selectedRepoID)
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
-
     const repoFields =
       repoMode === "existing" && selectedRepo
         ? {
@@ -64,7 +87,6 @@ export default function AddonNewPage() {
             default_branch: defaultBranch,
             integration_id: integrationID || undefined,
           }
-
     register.mutate({
       name,
       ...repoFields,
@@ -73,194 +95,173 @@ export default function AddonNewPage() {
     })
   }
 
-  if (meLoading) return <p>Loading…</p>
-  if (!user) return <p>You must be logged in to register an addon.</p>
-
   if (register.isSuccess) {
     const addon = register.data
     return (
-      <>
-        <h2>Addon registered</h2>
-        <p>
-          <strong>{addon.name}</strong> has been registered.
-        </p>
-        <p>
-          <Link to={`/addons/${addon.id}`}>Go to addon</Link>
-          {" | "}
-          <Link to="/">Back to overview</Link>
-        </p>
-      </>
+      <div className="mx-auto max-w-xl">
+        <Card className="flex flex-col items-center gap-3 p-8 text-center">
+          <CheckCircle2 className="size-10 text-success" />
+          <h1 className="text-xl font-semibold">Addon registered</h1>
+          <p className="text-sm text-muted">
+            <strong className="text-fg">{addon.name}</strong> has been
+            registered.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <Link to={`/addons/${addon.id}`} className={buttonVariants()}>
+              Go to addon
+            </Link>
+            <Link
+              to="/"
+              className={buttonVariants({ variant: "secondary" })}
+            >
+              Back to overview
+            </Link>
+          </div>
+        </Card>
+      </div>
     )
   }
 
   return (
-    <>
-      <p>
-        <Link to="/">Back</Link>
-      </p>
-      <h2>Register addon</h2>
+    <div className="mx-auto flex max-w-xl flex-col gap-6">
+      <Link
+        to="/"
+        className="inline-flex w-fit items-center gap-1 text-sm text-muted transition-colors hover:text-fg"
+      >
+        <ArrowLeft className="size-4" />
+        Back
+      </Link>
+      <h1 className="text-2xl font-semibold">Register addon</h1>
 
-      <form onSubmit={handleSubmit}>
-        <fieldset>
-          <legend>Repo</legend>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <Card className="flex flex-col gap-4 p-5">
+          <h2 className="font-medium">Repository</h2>
 
           {hasRepos && (
-            <p>
-              <label>
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-2">
                 <input
                   type="radio"
                   name="repo-mode"
-                  value="existing"
+                  className="accent-accent"
                   checked={repoMode === "existing"}
                   onChange={() => setRepoMode("existing")}
-                />{" "}
+                />
                 Use existing repo
               </label>
-              {"  "}
-              <label>
+              <label className="flex items-center gap-2">
                 <input
                   type="radio"
                   name="repo-mode"
-                  value="new"
+                  className="accent-accent"
                   checked={repoMode === "new"}
                   onChange={() => setRepoMode("new")}
-                />{" "}
+                />
                 Register new repo
               </label>
-            </p>
+            </div>
           )}
 
           {repoMode === "existing" && hasRepos ? (
-            <p>
-              <label>
-                Repo
-                <br />
-                <select
-                  required
-                  value={selectedRepoID}
-                  onChange={(e) => setSelectedRepoID(e.target.value)}
-                >
-                  <option value="">— Select a repo —</option>
-                  {myRepos!.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.git_url} ({r.default_branch})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {selectedRepo && (
-                <>
-                  <br />
-                  <small>
-                    Default branch: <code>{selectedRepo.default_branch}</code>
-                    {" · "}
-                    Integration:{" "}
-                    {selectedRepo.integration
-                      ? `${selectedRepo.integration.provider}${selectedRepo.integration.account_name ? ` (${selectedRepo.integration.account_name})` : ""}`
-                      : "none"}
-                  </small>
-                </>
-              )}
-            </p>
+            <Field label="Repo" htmlFor="repo">
+              <Select
+                id="repo"
+                required
+                value={selectedRepoID}
+                onChange={(e) => setSelectedRepoID(e.target.value)}
+              >
+                <option value="">Select a repo</option>
+                {repos.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.git_url} ({r.default_branch})
+                  </option>
+                ))}
+              </Select>
+            </Field>
           ) : (
             <>
-              <p>
-                <label>
-                  Git URL
-                  <br />
-                  <input
-                    required
-                    value={gitUrl}
-                    onChange={(e) => setGitUrl(e.target.value)}
-                    placeholder="https://bitbucket.org/org/repo.git"
-                  />
-                </label>
-              </p>
-
-              <p>
-                <label>
-                  Default branch
-                  <br />
-                  <input
-                    value={defaultBranch}
-                    onChange={(e) => setDefaultBranch(e.target.value)}
-                  />
-                </label>
-              </p>
-
-              <p>
-                <label>
-                  Integration
-                  <br />
-                  <select
-                    value={integrationID}
-                    onChange={(e) => setIntegrationID(e.target.value)}
-                  >
-                    <option value="">None (anonymous clone)</option>
-                    {(integrations ?? []).map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.provider}
-                        {i.account_name ? ` (${i.account_name})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </p>
+              <Field label="Git URL" htmlFor="git-url">
+                <Input
+                  id="git-url"
+                  required
+                  value={gitUrl}
+                  onChange={(e) => setGitUrl(e.target.value)}
+                  placeholder="https://git.example.com/org/repo.git"
+                />
+              </Field>
+              <Field label="Default branch" htmlFor="default-branch">
+                <Input
+                  id="default-branch"
+                  value={defaultBranch}
+                  onChange={(e) => setDefaultBranch(e.target.value)}
+                />
+              </Field>
+              <Field label="Integration" htmlFor="integration">
+                <Select
+                  id="integration"
+                  value={integrationID}
+                  onChange={(e) => setIntegrationID(e.target.value)}
+                >
+                  <option value="">None (anonymous clone)</option>
+                  {integrations.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.provider}
+                      {i.account_name ? ` (${i.account_name})` : ""}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
             </>
           )}
-        </fieldset>
+        </Card>
 
-        <fieldset>
-          <legend>Addon</legend>
-
-          <p>
-            <label>
-              Name
-              <br />
-              <input
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="vendor/name"
-              />
-            </label>
-          </p>
-
-          <p>
-            <label>
-              Subpath
-              <br />
-              <input
-                value={subpath}
-                onChange={(e) => setSubpath(e.target.value)}
-                placeholder="(leave empty if manifest is at repo root)"
-              />
-            </label>
-          </p>
-
-          <p>
-            <label>
-              Visibility
-              <br />
-              <select
-                value={visibility}
-                onChange={(e) => setVisibility(e.target.value as Visibility)}
-              >
-                <option value="public">Public</option>
-                <option value="private">Private</option>
-              </select>
-            </label>
-          </p>
-        </fieldset>
+        <Card className="flex flex-col gap-4 p-5">
+          <h2 className="font-medium">Addon</h2>
+          <Field label="Name" htmlFor="name">
+            <Input
+              id="name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="vendor/name"
+            />
+          </Field>
+          <Field
+            label="Subpath"
+            htmlFor="subpath"
+            hint="Leave empty if the manifest is at the repo root."
+          >
+            <Input
+              id="subpath"
+              value={subpath}
+              onChange={(e) => setSubpath(e.target.value)}
+              placeholder="addons/my_module"
+            />
+          </Field>
+          <Field label="Visibility" htmlFor="visibility">
+            <Select
+              id="visibility"
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value as Visibility)}
+            >
+              <option value="public">Public</option>
+              <option value="private">Private</option>
+            </Select>
+          </Field>
+        </Card>
 
         {register.isError && (
-          <p>Registration failed: {register.error.message}</p>
+          <p className="text-sm text-danger">
+            Registration failed: {register.error.message}
+          </p>
         )}
 
-        <button type="submit" disabled={register.isPending}>
-          {register.isPending ? "Registering…" : "Register"}
-        </button>
+        <div className="flex justify-end">
+          <Button type="submit" loading={register.isPending}>
+            Register addon
+          </Button>
+        </div>
       </form>
-    </>
+    </div>
   )
 }
