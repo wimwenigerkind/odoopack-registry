@@ -56,4 +56,8 @@
   body {
     @apply bg-canvas text-fg font-sans antialiased;
   }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
 }
