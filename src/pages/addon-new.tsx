@@ -123,7 +123,7 @@ function NewAddonForm({
   }
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <Link
         to="/"
         className="inline-flex w-fit items-center gap-1 text-sm text-muted transition-colors hover:text-fg"
@@ -133,7 +133,11 @@ function NewAddonForm({
       </Link>
       <h1 className="text-2xl font-semibold">Register addon</h1>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-6 lg:col-span-2"
+        >
         <Card className="flex flex-col gap-4 p-5">
           <h2 className="font-medium">Repository</h2>
 
@@ -256,12 +260,40 @@ function NewAddonForm({
           </p>
         )}
 
-        <div className="flex justify-end">
-          <Button type="submit" loading={register.isPending}>
-            Register addon
-          </Button>
-        </div>
-      </form>
+          <div className="flex justify-end">
+            <Button type="submit" loading={register.isPending}>
+              Register addon
+            </Button>
+          </div>
+        </form>
+
+        <Card className="flex h-fit flex-col gap-4 p-5">
+          <h2 className="font-medium">About</h2>
+          <div className="flex flex-col gap-3 text-sm">
+            <div>
+              <p className="font-medium">Repository</p>
+              <p className="text-muted">
+                Reuse a repo you own or add a new URL. Private repos need a git
+                integration, set up in your profile.
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">Subpath</p>
+              <p className="text-muted">
+                Path to the module inside the repo. Leave empty if it lives at
+                the repo root.
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">Visibility</p>
+              <p className="text-muted">
+                Public addons are listed for everyone. Private addons are
+                restricted to you and granted groups.
+              </p>
+            </div>
+          </div>
+        </Card>
+      </div>
     </div>
   )
 }
