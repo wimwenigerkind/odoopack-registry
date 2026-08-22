@@ -1,4 +1,3 @@
-import './App.css'
 import HomePage from "@/pages/home.tsx";
 import {createBrowserRouter, RouterProvider} from "react-router";
 import RootLayout from "@/layouts/root.tsx";
