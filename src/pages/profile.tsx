@@ -124,7 +124,11 @@ function AccountsCard({ identities }: { identities: Identity[] }) {
                 </span>
                 <ConfirmDialog
                   trigger={
-                    <Button variant="ghost" size="sm">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-danger hover:bg-danger/10 hover:text-danger"
+                    >
                       Unlink
                     </Button>
                   }
