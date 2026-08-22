@@ -1,7 +1,5 @@
 import {
   ArrowLeft,
-  Check,
-  Copy,
   Download,
   FileText,
   Package,
@@ -19,6 +17,7 @@ import {
   buttonVariants,
   Card,
   ConfirmDialog,
+  CopyButton,
   EmptyState,
   Select,
   Spinner,
@@ -289,27 +288,11 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
 
 function InstallSnippet({ name }: { name: string }) {
   const cmd = `odoopack add ${name}`
-  const [copied, setCopied] = useState(false)
   return (
     <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 font-mono text-sm">
       <span className="select-none text-muted">$</span>
       <code className="flex-1 truncate">{cmd}</code>
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-label="Copy install command"
-        onClick={() => {
-          navigator.clipboard?.writeText(cmd)
-          setCopied(true)
-          window.setTimeout(() => setCopied(false), 1500)
-        }}
-      >
-        {copied ? (
-          <Check className="size-4 text-success" />
-        ) : (
-          <Copy className="size-4" />
-        )}
-      </Button>
+      <CopyButton value={cmd} />
     </div>
   )
 }
