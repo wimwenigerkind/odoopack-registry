@@ -1,5 +1,23 @@
-import { type FormEvent, useState } from "react"
+import { Plus, Trash2 } from "lucide-react"
+import { useState } from "react"
+import type { FormEvent } from "react"
 import { Link } from "react-router"
+import { AdminNav } from "@/components/admin-nav"
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  Field,
+  Input,
+  Spinner,
+  Table,
+  TBody,
+  TD,
+  TH,
+  THead,
+  TR,
+} from "@/components/ui"
 import {
   useCreateGroup,
   useDeleteGroup,
@@ -15,74 +33,94 @@ export default function AdminGroupsPage() {
   const handleCreate = (e: FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
-    createGroup.mutate(
-      { name: name.trim() },
-      {
-        onSuccess: () => setName(""),
-      },
-    )
+    createGroup.mutate({ name: name.trim() }, { onSuccess: () => setName("") })
   }
 
   return (
-    <>
-      <p>
-        <Link to="/">Back</Link>
-      </p>
-      <h2>Groups</h2>
+    <div className="flex flex-col gap-6">
+      <h1 className="text-2xl font-semibold">Admin</h1>
+      <AdminNav />
 
-      <form onSubmit={handleCreate}>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Group name"
-        />{" "}
-        <button type="submit" disabled={createGroup.isPending}>
-          {createGroup.isPending ? "Creating..." : "Create"}
-        </button>
+      <Card className="p-5">
+        <form onSubmit={handleCreate} className="flex items-end gap-2">
+          <div className="flex-1">
+            <Field label="New group" htmlFor="group-name">
+              <Input
+                id="group-name"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Group name"
+              />
+            </Field>
+          </div>
+          <Button type="submit" loading={createGroup.isPending}>
+            <Plus className="size-4" />
+            Create
+          </Button>
+        </form>
         {createGroup.isError && (
-          <p>Failed to create: {createGroup.error.message}</p>
+          <p className="mt-2 text-sm text-danger">
+            Failed to create: {createGroup.error.message}
+          </p>
         )}
-      </form>
+      </Card>
 
       {isLoading ? (
-        <p>Loading...</p>
+        <div className="flex justify-center py-8">
+          <Spinner className="size-6" />
+        </div>
       ) : isError ? (
-        <p>Could not load groups</p>
+        <p className="text-danger">Could not load groups.</p>
       ) : (groups ?? []).length === 0 ? (
-        <p>No groups yet.</p>
+        <EmptyState title="No groups yet" description="Create a group above." />
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Created</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <THead>
+            <TR>
+              <TH>Name</TH>
+              <TH>Created</TH>
+              <TH></TH>
+            </TR>
+          </THead>
+          <TBody>
             {(groups ?? []).map((g) => (
-              <tr key={g.id}>
-                <td>
-                  <Link to={`/admin/groups/${g.id}`}>{g.name}</Link>
-                </td>
-                <td>{new Date(g.created_at).toLocaleDateString()}</td>
-                <td>
-                  <button
-                    onClick={() => {
-                      if (confirm(`Delete group "${g.name}"?`)) {
-                        deleteGroup.mutate(g.id)
-                      }
-                    }}
-                    disabled={deleteGroup.isPending}
+              <TR key={g.id}>
+                <TD className="font-medium">
+                  <Link
+                    to={`/admin/groups/${g.id}`}
+                    className="hover:text-accent"
                   >
-                    Delete
-                  </button>
-                </td>
-              </tr>
+                    {g.name}
+                  </Link>
+                </TD>
+                <TD className="text-muted">
+                  {new Date(g.created_at).toLocaleDateString()}
+                </TD>
+                <TD className="text-right">
+                  <ConfirmDialog
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-danger hover:bg-danger/10 hover:text-danger"
+                        aria-label={`Delete group ${g.name}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    }
+                    title={`Delete group ${g.name}?`}
+                    confirmLabel="Delete"
+                    destructive
+                    loading={deleteGroup.isPending}
+                    onConfirm={() => deleteGroup.mutate(g.id)}
+                  />
+                </TD>
+              </TR>
             ))}
-          </tbody>
-        </table>
+          </TBody>
+        </Table>
       )}
-    </>
+    </div>
   )
 }

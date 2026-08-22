@@ -1,43 +1,60 @@
-import { Link } from "react-router"
+import { AdminNav } from "@/components/admin-nav"
+import {
+  Badge,
+  Spinner,
+  Table,
+  TBody,
+  TD,
+  TH,
+  THead,
+  TR,
+} from "@/components/ui"
 import { useUsers } from "@/hooks/admin/use-users"
 
 export default function AdminUsersPage() {
   const { data: users, isLoading, isError } = useUsers()
 
   return (
-    <>
-      <p>
-        <Link to="/">Back</Link>
-      </p>
-      <h2>Users</h2>
+    <div className="flex flex-col gap-6">
+      <h1 className="text-2xl font-semibold">Admin</h1>
+      <AdminNav />
+
       {isLoading ? (
-        <p>Loading...</p>
+        <div className="flex justify-center py-8">
+          <Spinner className="size-6" />
+        </div>
       ) : isError ? (
-        <p>Could not load users</p>
+        <p className="text-danger">Could not load users.</p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Username</th>
-              <th>Admin</th>
-              <th>ID</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <THead>
+            <TR>
+              <TH>Email</TH>
+              <TH>Username</TH>
+              <TH>Role</TH>
+              <TH>ID</TH>
+            </TR>
+          </THead>
+          <TBody>
             {(users ?? []).map((u) => (
-              <tr key={u.id}>
-                <td>{u.email}</td>
-                <td>{u.username || "-"}</td>
-                <td>{u.is_admin ? "yes" : "no"}</td>
-                <td>
-                  <code>{u.id}</code>
-                </td>
-              </tr>
+              <TR key={u.id}>
+                <TD className="font-medium">{u.email}</TD>
+                <TD className="text-muted">{u.username || "-"}</TD>
+                <TD>
+                  {u.is_admin ? (
+                    <Badge variant="accent">admin</Badge>
+                  ) : (
+                    <span className="text-muted">user</span>
+                  )}
+                </TD>
+                <TD className="text-muted">
+                  <code className="text-xs">{u.id}</code>
+                </TD>
+              </TR>
             ))}
-          </tbody>
-        </table>
+          </TBody>
+        </Table>
       )}
-    </>
+    </div>
   )
 }
