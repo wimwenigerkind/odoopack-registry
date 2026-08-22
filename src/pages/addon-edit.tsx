@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, ArrowRight, FolderGit2 } from "lucide-react"
 import { useState } from "react"
 import type { FormEvent } from "react"
 import { Link, useNavigate, useParams } from "react-router"
@@ -46,71 +46,127 @@ function EditForm({ addon }: { addon: Addon }) {
   }
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <Link
         to={`/addons/${addon.id}`}
         className="inline-flex w-fit items-center gap-1 text-sm text-muted transition-colors hover:text-fg"
       >
         <ArrowLeft className="size-4" />
-        Back
+        Back to addon
       </Link>
 
       <div>
         <h1 className="text-2xl font-semibold">Edit {addon.name}</h1>
         <p className="mt-1 text-sm text-muted">
-          Repo-level settings (git URL, default branch, integration) live on the{" "}
-          <Link to={`/repos/${addon.repo_id}`} className="text-accent">
-            repo
-          </Link>
-          .
+          Manage addon-level settings. Repository settings live on the repo.
         </p>
       </div>
 
-      <Card className="p-5">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Field
-            label="Subpath"
-            htmlFor="subpath"
-            hint="Leave empty if the manifest is at the repo root."
-          >
-            <Input
-              id="subpath"
-              value={subpath}
-              onChange={(e) => setSubpath(e.target.value)}
-              placeholder="addons/my_module"
-            />
-          </Field>
-
-          <Field label="Visibility" htmlFor="visibility">
-            <Select
-              id="visibility"
-              value={visibility}
-              onChange={(e) => setVisibility(e.target.value as Visibility)}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="p-5 lg:col-span-2">
+          <h2 className="mb-4 font-medium">Addon settings</h2>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <Field
+              label="Subpath"
+              htmlFor="subpath"
+              hint="Path to the module inside the repo. Leave empty if the manifest is at the repo root."
             >
-              <option value="public">Public</option>
-              <option value="private">Private</option>
-            </Select>
-          </Field>
+              <Input
+                id="subpath"
+                value={subpath}
+                onChange={(e) => setSubpath(e.target.value)}
+                placeholder="addons/my_module"
+              />
+            </Field>
 
-          {update.isError && (
-            <p className="text-sm text-danger">
-              Update failed: {update.error.message}
-            </p>
-          )}
-
-          <div className="flex justify-end gap-2">
-            <Link
-              to={`/addons/${addon.id}`}
-              className={buttonVariants({ variant: "secondary" })}
+            <Field
+              label="Visibility"
+              htmlFor="visibility"
+              hint="Public addons are visible to everyone. Private addons are restricted to you and granted groups."
             >
-              Cancel
-            </Link>
-            <Button type="submit" loading={update.isPending}>
-              Save
-            </Button>
+              <Select
+                id="visibility"
+                value={visibility}
+                onChange={(e) => setVisibility(e.target.value as Visibility)}
+              >
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+              </Select>
+            </Field>
+
+            {update.isError && (
+              <p className="text-sm text-danger">
+                Update failed: {update.error.message}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-2 border-t border-border pt-4">
+              <Link
+                to={`/addons/${addon.id}`}
+                className={buttonVariants({ variant: "secondary" })}
+              >
+                Cancel
+              </Link>
+              <Button type="submit" loading={update.isPending}>
+                Save changes
+              </Button>
+            </div>
+          </form>
+        </Card>
+
+        <Card className="flex h-fit flex-col gap-4 p-5">
+          <div className="flex items-center gap-2 font-medium">
+            <FolderGit2 className="size-4 text-muted" />
+            Repository
           </div>
-        </form>
-      </Card>
+
+          <dl className="flex flex-col gap-3 text-sm">
+            <div className="flex flex-col gap-1">
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                Git URL
+              </dt>
+              <dd>
+                <code className="break-all">
+                  {addon.repo?.git_url ?? "-"}
+                </code>
+              </dd>
+            </div>
+            <div className="flex flex-col gap-1">
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                Default branch
+              </dt>
+              <dd>
+                <code>{addon.repo?.default_branch ?? "-"}</code>
+              </dd>
+            </div>
+            <div className="flex flex-col gap-1">
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                Integration
+              </dt>
+              <dd>
+                {addon.repo?.integration ? (
+                  <span>
+                    {addon.repo.integration.provider}
+                    {addon.repo.integration.account_name
+                      ? ` (${addon.repo.integration.account_name})`
+                      : ""}
+                  </span>
+                ) : (
+                  <span className="text-muted">none (anonymous clone)</span>
+                )}
+              </dd>
+            </div>
+          </dl>
+
+          <Link
+            to={`/repos/${addon.repo_id}`}
+            className={buttonVariants({ variant: "secondary" })}
+          >
+            Manage repository
+            <ArrowRight className="size-4" />
+          </Link>
+        </Card>
+      </div>
     </div>
   )
 }
