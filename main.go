@@ -117,6 +117,18 @@ func buildStorage() (storage.Storage, error) {
 	switch viper.GetString("storage.driver") {
 	case "local":
 		return storage.NewLocalStorage(viper.GetString("storage.local.root"))
+	case "s3":
+		return storage.NewS3Storage(storage.S3Config{
+			Endpoint:        viper.GetString("storage.s3.endpoint"),
+			Region:          viper.GetString("storage.s3.region"),
+			Bucket:          viper.GetString("storage.s3.bucket"),
+			AccessKeyID:     viper.GetString("storage.s3.access_key_id"),
+			SecretAccessKey: viper.GetString("storage.s3.secret_access_key"),
+			UseSSL:          viper.GetBool("storage.s3.use_ssl"),
+			UsePathStyle:    viper.GetBool("storage.s3.use_path_style"),
+			Prefix:          viper.GetString("storage.s3.prefix"),
+			PresignTTL:      viper.GetDuration("storage.s3.presign_ttl"),
+		})
 	default:
 		return nil, fmt.Errorf("unsupported storage driver %q", viper.GetString("storage.driver"))
 	}

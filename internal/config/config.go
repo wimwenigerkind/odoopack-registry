@@ -23,6 +23,16 @@ func LoadConfig() {
 	viper.SetDefault("storage.driver", "local")
 	viper.SetDefault("storage.local.root", "./data/storage")
 
+	viper.SetDefault("storage.s3.endpoint", "")
+	viper.SetDefault("storage.s3.region", "us-east-1")
+	viper.SetDefault("storage.s3.bucket", "")
+	viper.SetDefault("storage.s3.access_key_id", "")
+	viper.SetDefault("storage.s3.secret_access_key", "")
+	viper.SetDefault("storage.s3.use_ssl", true)
+	viper.SetDefault("storage.s3.use_path_style", false)
+	viper.SetDefault("storage.s3.prefix", "")
+	viper.SetDefault("storage.s3.presign_ttl", "5m")
+
 	viper.SetDefault("worker.count", 2)
 	viper.SetDefault("worker.queue_size", 64)
 
