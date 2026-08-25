@@ -138,6 +138,7 @@ export interface RegisterAddonRequest {
 }
 
 export interface UpdateAddonRequest {
+  name?: string
   subpath?: string
   visibility?: Visibility
 }

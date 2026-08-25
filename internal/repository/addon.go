@@ -9,6 +9,7 @@ import (
 )
 
 var ErrNotFound = errors.New("repository: record not found")
+var ErrConflict = errors.New("repository: conflict")
 
 type AddonRepository struct {
 	db *gorm.DB
@@ -23,10 +24,15 @@ func (r *AddonRepository) Create(addon *models.Addon) error {
 }
 
 func (r *AddonRepository) Update(addon *models.Addon) error {
-	return r.db.Model(addon).Select("subpath", "visibility").Updates(map[string]any{
+	err := r.db.Model(addon).Select("name", "subpath", "visibility").Updates(map[string]any{
+		"name":       addon.Name,
 		"subpath":    addon.Subpath,
 		"visibility": addon.Visibility,
 	}).Error
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return ErrConflict
+	}
+	return err
 }
 
 func (r *AddonRepository) GetByID(id uuid.UUID) (*models.Addon, error) {

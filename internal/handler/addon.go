@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -232,6 +233,7 @@ func (h *AddonHandler) Delete(c *gin.Context) {
 }
 
 type updateAddonRequest struct {
+	Name       string            `json:"name"`
 	Subpath    string            `json:"subpath"`
 	Visibility models.Visibility `json:"visibility"`
 }
@@ -266,12 +268,22 @@ func (h *AddonHandler) Update(c *gin.Context) {
 		return
 	}
 
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+		return
+	}
+	addon.Name = name
 	addon.Subpath = req.Subpath
 	if req.Visibility != "" {
 		addon.Visibility = req.Visibility
 	}
 
 	if err := h.addons.Update(addon); err != nil {
+		if errors.Is(err, repository.ErrConflict) {
+			c.JSON(http.StatusConflict, gin.H{"error": "addon name already taken"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}

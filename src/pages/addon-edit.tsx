@@ -34,13 +34,14 @@ export default function AddonEditPage() {
 function EditForm({ addon }: { addon: Addon }) {
   const update = useUpdateAddon(addon.id)
   const navigate = useNavigate()
+  const [name, setName] = useState(addon.name)
   const [subpath, setSubpath] = useState(addon.subpath ?? "")
   const [visibility, setVisibility] = useState<Visibility>(addon.visibility)
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     update.mutate(
-      { subpath, visibility },
+      { name: name.trim(), subpath, visibility },
       { onSuccess: () => navigate(`/addons/${addon.id}`) },
     )
   }
@@ -66,6 +67,20 @@ function EditForm({ addon }: { addon: Addon }) {
         <Card className="p-5 lg:col-span-2">
           <h2 className="mb-4 font-medium">Addon settings</h2>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <Field
+              label="Name"
+              htmlFor="name"
+              hint="The addon's unique name, e.g. vendor/name. Changing it updates how it is installed."
+            >
+              <Input
+                id="name"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="vendor/name"
+              />
+            </Field>
+
             <Field
               label="Subpath"
               htmlFor="subpath"
