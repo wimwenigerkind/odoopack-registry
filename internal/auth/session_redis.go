@@ -87,3 +87,7 @@ func (s *redisSessionStore) Delete(id string) error {
 func (s *redisSessionStore) Stop() {
 	_ = s.client.Close()
 }
+
+func (s *redisSessionStore) Ping(ctx context.Context) error {
+	return s.client.Ping(ctx).Err()
+}

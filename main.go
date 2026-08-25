@@ -112,6 +112,22 @@ func main() {
 	apiKeyOptional := middleware.ApiKeyOptional(tokenRepo)
 	registerRoutes(r, mode, addonHandler, repoHandler, downloadHandler, triggerHandler, registryHandler, authHandler, groupHandler, userHandler, tokenHandler, integrationHandler, webhookHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional)
 
+	healthChecks := []handler.HealthCheck{
+		{Name: "database", Fn: func(ctx context.Context) error {
+			sqlDB, err := db.DB()
+			if err != nil {
+				return err
+			}
+			return sqlDB.PingContext(ctx)
+		}},
+	}
+	if pinger, ok := sessionStore.(interface{ Ping(context.Context) error }); ok {
+		healthChecks = append(healthChecks, handler.HealthCheck{Name: "redis", Fn: pinger.Ping})
+	}
+	healthHandler := handler.NewHealthHandler(healthChecks...)
+	r.GET("/healthz", healthHandler.Live)
+	r.GET("/readyz", healthHandler.Ready)
+
 	addr := viper.GetString("server_address")
 	slog.Info("starting server", "addr", addr)
 	if err := r.Run(addr); err != nil {
