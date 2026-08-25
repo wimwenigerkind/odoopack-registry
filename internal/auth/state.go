@@ -25,20 +25,26 @@ type FlowState struct {
 	UserID   string
 }
 
+type StateStore interface {
+	Save(state string, fs FlowState, ttl time.Duration) error
+	Take(state string) (FlowState, error)
+	Stop()
+}
+
 type stateEntry struct {
 	fs        FlowState
 	expiresAt time.Time
 }
 
-type StateStore struct {
+type memoryStateStore struct {
 	mu       sync.Mutex
 	items    map[string]stateEntry
 	stop     chan struct{}
 	stopOnce sync.Once
 }
 
-func NewStateStore() *StateStore {
-	s := &StateStore{
+func NewMemoryStateStore() StateStore {
+	s := &memoryStateStore{
 		items: make(map[string]stateEntry),
 		stop:  make(chan struct{}),
 	}
@@ -46,14 +52,14 @@ func NewStateStore() *StateStore {
 	return s
 }
 
-func (s *StateStore) Save(state string, fs FlowState, ttl time.Duration) error {
+func (s *memoryStateStore) Save(state string, fs FlowState, ttl time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.items[state] = stateEntry{fs: fs, expiresAt: time.Now().Add(ttl)}
 	return nil
 }
 
-func (s *StateStore) Take(state string) (FlowState, error) {
+func (s *memoryStateStore) Take(state string) (FlowState, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	e, ok := s.items[state]
@@ -67,11 +73,11 @@ func (s *StateStore) Take(state string) (FlowState, error) {
 	return e.fs, nil
 }
 
-func (s *StateStore) Stop() {
+func (s *memoryStateStore) Stop() {
 	s.stopOnce.Do(func() { close(s.stop) })
 }
 
-func (s *StateStore) janitor() {
+func (s *memoryStateStore) janitor() {
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
 	for {

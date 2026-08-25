@@ -22,13 +22,13 @@ const bitbucketAPITimeout = 30 * time.Second
 
 type IntegrationHandler struct {
 	registry     *auth.Registry
-	stateStore   *auth.StateStore
+	stateStore   auth.StateStore
 	integrations *repository.IntegrationRepository
 	cookieSecure bool
 	baseURL      string
 }
 
-func NewIntegrationHandler(reg *auth.Registry, stateStore *auth.StateStore, integrations *repository.IntegrationRepository, cookieSecure bool, baseURL string) *IntegrationHandler {
+func NewIntegrationHandler(reg *auth.Registry, stateStore auth.StateStore, integrations *repository.IntegrationRepository, cookieSecure bool, baseURL string) *IntegrationHandler {
 	return &IntegrationHandler{
 		registry:     reg,
 		stateStore:   stateStore,
