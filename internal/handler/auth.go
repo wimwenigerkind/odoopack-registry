@@ -30,13 +30,13 @@ var (
 type AuthHandler struct {
 	registry     *auth.Registry
 	stateStore   *auth.StateStore
-	sessions     *auth.SessionStore
+	sessions     auth.SessionStore
 	users        *repository.UserRepository
 	integrations *repository.IntegrationRepository
 	cookieSecure bool
 }
 
-func NewAuthHandler(reg *auth.Registry, store *auth.StateStore, sessions *auth.SessionStore, users *repository.UserRepository, integrations *repository.IntegrationRepository, cookieSecure bool) *AuthHandler {
+func NewAuthHandler(reg *auth.Registry, store *auth.StateStore, sessions auth.SessionStore, users *repository.UserRepository, integrations *repository.IntegrationRepository, cookieSecure bool) *AuthHandler {
 	return &AuthHandler{
 		registry:     reg,
 		stateStore:   store,

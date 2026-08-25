@@ -65,7 +65,10 @@ func main() {
 	queue.Start(ctx, viper.GetInt("worker.count"))
 	stateStore := auth.NewStateStore()
 	defer stateStore.Stop()
-	sessionStore := auth.NewSessionStore()
+	sessionStore, err := buildSessionStore()
+	if err != nil {
+		fatal("session store", err)
+	}
 	defer sessionStore.Stop()
 
 	mode := viper.GetString("instance.mode")
@@ -131,6 +134,17 @@ func buildStorage() (storage.Storage, error) {
 		})
 	default:
 		return nil, fmt.Errorf("unsupported storage driver %q", viper.GetString("storage.driver"))
+	}
+}
+
+func buildSessionStore() (auth.SessionStore, error) {
+	switch viper.GetString("session.store") {
+	case "", "memory":
+		return auth.NewMemorySessionStore(), nil
+	case "redis":
+		return auth.NewRedisSessionStore(viper.GetString("redis.url"))
+	default:
+		return nil, fmt.Errorf("unsupported session store %q", viper.GetString("session.store"))
 	}
 }
 

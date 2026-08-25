@@ -13,23 +13,30 @@ const SessionCookieName = "session"
 var ErrSessionNotFound = errors.New("session not found or expired")
 
 type Session struct {
-	ID        string
-	UserID    uuid.UUID
-	ExpiresAt time.Time
-	CreatedAt time.Time
-	UserAgent string
-	IP        string
+	ID        string    `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UserAgent string    `json:"user_agent"`
+	IP        string    `json:"ip"`
 }
 
-type SessionStore struct {
+type SessionStore interface {
+	Create(userID uuid.UUID, ttl time.Duration, userAgent, ip string) (Session, error)
+	Get(id string) (Session, error)
+	Delete(id string) error
+	Stop()
+}
+
+type memorySessionStore struct {
 	mu       sync.Mutex
 	items    map[string]Session
 	stop     chan struct{}
 	stopOnce sync.Once
 }
 
-func NewSessionStore() *SessionStore {
-	s := &SessionStore{
+func NewMemorySessionStore() SessionStore {
+	s := &memorySessionStore{
 		items: make(map[string]Session),
 		stop:  make(chan struct{}),
 	}
@@ -37,7 +44,7 @@ func NewSessionStore() *SessionStore {
 	return s
 }
 
-func (s *SessionStore) Create(userID uuid.UUID, ttl time.Duration, userAgent, ip string) (Session, error) {
+func (s *memorySessionStore) Create(userID uuid.UUID, ttl time.Duration, userAgent, ip string) (Session, error) {
 	id := NewState()
 	now := time.Now()
 	sess := Session{
@@ -54,7 +61,7 @@ func (s *SessionStore) Create(userID uuid.UUID, ttl time.Duration, userAgent, ip
 	return sess, nil
 }
 
-func (s *SessionStore) Get(id string) (Session, error) {
+func (s *memorySessionStore) Get(id string) (Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sess, ok := s.items[id]
@@ -68,18 +75,18 @@ func (s *SessionStore) Get(id string) (Session, error) {
 	return sess, nil
 }
 
-func (s *SessionStore) Delete(id string) error {
+func (s *memorySessionStore) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.items, id)
 	return nil
 }
 
-func (s *SessionStore) Stop() {
+func (s *memorySessionStore) Stop() {
 	s.stopOnce.Do(func() { close(s.stop) })
 }
 
-func (s *SessionStore) janitor() {
+func (s *memorySessionStore) janitor() {
 	t := time.NewTicker(5 * time.Minute)
 	defer t.Stop()
 	for {

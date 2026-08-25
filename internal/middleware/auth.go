@@ -16,7 +16,7 @@ const (
 	contextKeySession = "auth.session"
 )
 
-func RequireAdmin(sessions *auth.SessionStore, users *repository.UserRepository) gin.HandlerFunc {
+func RequireAdmin(sessions auth.SessionStore, users *repository.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sess, ok := loadSession(c, sessions)
 		if !ok || sess.UserID == uuid.Nil {
@@ -34,7 +34,7 @@ func RequireAdmin(sessions *auth.SessionStore, users *repository.UserRepository)
 	}
 }
 
-func RequireAuth(sessions *auth.SessionStore) gin.HandlerFunc {
+func RequireAuth(sessions auth.SessionStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sess, ok := loadSession(c, sessions)
 		if !ok || sess.UserID == uuid.Nil {
@@ -47,7 +47,7 @@ func RequireAuth(sessions *auth.SessionStore) gin.HandlerFunc {
 	}
 }
 
-func OptionalAuth(sessions *auth.SessionStore) gin.HandlerFunc {
+func OptionalAuth(sessions auth.SessionStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if sess, ok := loadSession(c, sessions); ok && sess.UserID != uuid.Nil {
 			c.Set(contextKeyUserID, sess.UserID)
@@ -109,7 +109,7 @@ func CurrentSession(c *gin.Context) (auth.Session, bool) {
 	return sess, ok
 }
 
-func loadSession(c *gin.Context, sessions *auth.SessionStore) (auth.Session, bool) {
+func loadSession(c *gin.Context, sessions auth.SessionStore) (auth.Session, bool) {
 	cookie, err := c.Cookie(auth.SessionCookieName)
 	if err != nil || cookie == "" {
 		return auth.Session{}, false

@@ -33,6 +33,9 @@ func LoadConfig() {
 	viper.SetDefault("storage.s3.prefix", "")
 	viper.SetDefault("storage.s3.presign_ttl", "5m")
 
+	viper.SetDefault("session.store", "memory") // "memory" or "redis"
+	viper.SetDefault("redis.url", "redis://localhost:6379/0")
+
 	viper.SetDefault("worker.count", 2)
 	viper.SetDefault("worker.queue_size", 64)
 
