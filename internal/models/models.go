@@ -58,3 +58,29 @@ type AddonVersionReadme struct {
 	HTML           string    `gorm:"type:text" json:"html"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
+
+type SyncJobStatus string
+
+const (
+	SyncJobPending SyncJobStatus = "pending"
+	SyncJobRunning SyncJobStatus = "running"
+	SyncJobFailed  SyncJobStatus = "failed"
+)
+
+type SyncJob struct {
+	Base
+	AddonID       uuid.UUID     `gorm:"type:uuid;not null;index" json:"addon_id"`
+	Name          string        `json:"name"`
+	GitURL        string        `json:"git_url"`
+	DefaultBranch string        `json:"default_branch"`
+	Subpath       string        `json:"subpath"`
+	Trigger       string        `json:"trigger"`
+	IntegrationID *uuid.UUID    `gorm:"type:uuid" json:"integration_id,omitempty"`
+	Status        SyncJobStatus `gorm:"not null;default:pending;index" json:"status"`
+	Attempts      int           `gorm:"not null;default:0" json:"attempts"`
+	MaxAttempts   int           `gorm:"not null;default:3" json:"max_attempts"`
+	RunAfter      time.Time     `gorm:"index" json:"run_after"`
+	LockedAt      *time.Time    `json:"locked_at,omitempty"`
+	LockedBy      string        `json:"locked_by,omitempty"`
+	LastError     string        `json:"last_error,omitempty"`
+}

@@ -30,6 +30,7 @@ func Migrate(db *gorm.DB) error {
 		&models.Addon{},
 		&models.AddonVersion{},
 		&models.AddonVersionReadme{},
+		&models.SyncJob{},
 		&models.Group{},
 		&models.GroupMembership{},
 		&models.GroupAddonAccess{},

@@ -110,7 +110,7 @@ func (h *WebhookHandler) Bitbucket(c *gin.Context) {
 		if addon.Repo == nil {
 			continue
 		}
-		h.queue.Enqueue(worker.SyncJob{
+		if err := h.queue.Enqueue(worker.SyncJob{
 			AddonID:       addon.ID,
 			Name:          addon.Name,
 			GitURL:        addon.Repo.GitURL,
@@ -118,7 +118,10 @@ func (h *WebhookHandler) Bitbucket(c *gin.Context) {
 			Subpath:       addon.Subpath,
 			Trigger:       "webhook",
 			IntegrationID: addon.Repo.IntegrationID,
-		})
+		}); err != nil {
+			slog.Error("enqueue webhook sync", "addon", addon.ID, "err", err)
+			continue
+		}
 		queued++
 	}
 	slog.Info("bitbucket webhook", "integration", it.ID, "repo", repoPath, "queued", queued)

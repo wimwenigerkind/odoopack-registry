@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
@@ -18,100 +19,151 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
+	"gorm.io/gorm"
 )
 
-type SyncJob struct {
-	AddonID       uuid.UUID
-	Name          string
-	GitURL        string
-	DefaultBranch string
-	Subpath       string
-	Trigger       string
-	IntegrationID *uuid.UUID
-}
-
-type Queue struct {
-	jobs            chan SyncJob
+type Consumer struct {
+	db              *gorm.DB
 	versionRepo     *repository.AddonVersionRepository
 	integrationRepo *repository.IntegrationRepository
 	authRegistry    *auth.Registry
 	storage         storage.Storage
+	id              string
+	pollInterval    time.Duration
 	wg              sync.WaitGroup
 }
 
-func NewQueue(versionRepo *repository.AddonVersionRepository, integrationRepo *repository.IntegrationRepository, authRegistry *auth.Registry, store storage.Storage, bufferSize int) *Queue {
-	return &Queue{
-		jobs:            make(chan SyncJob, bufferSize),
+func NewConsumer(db *gorm.DB, versionRepo *repository.AddonVersionRepository, integrationRepo *repository.IntegrationRepository, authRegistry *auth.Registry, store storage.Storage, pollInterval time.Duration) *Consumer {
+	if pollInterval <= 0 {
+		pollInterval = 2 * time.Second
+	}
+	return &Consumer{
+		db:              db,
 		versionRepo:     versionRepo,
 		integrationRepo: integrationRepo,
 		authRegistry:    authRegistry,
 		storage:         store,
+		id:              "worker-" + uuid.NewString(),
+		pollInterval:    pollInterval,
 	}
 }
 
-func (q *Queue) Start(ctx context.Context, workers int) {
+func (c *Consumer) Run(ctx context.Context, workers int) {
 	for i := range workers {
-		q.wg.Add(1)
-		go q.run(ctx, i)
+		c.wg.Add(1)
+		go c.loop(ctx, i)
 	}
 }
 
-func (q *Queue) Enqueue(job SyncJob) {
-	q.jobs <- job
+func (c *Consumer) Wait() {
+	c.wg.Wait()
 }
 
-func (q *Queue) Stop() {
-	close(q.jobs)
-	q.wg.Wait()
-}
-
-func (q *Queue) run(ctx context.Context, id int) {
-	defer q.wg.Done()
+func (c *Consumer) loop(ctx context.Context, id int) {
+	defer c.wg.Done()
+	log := slog.With("worker", id)
+	t := time.NewTicker(c.pollInterval)
+	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case job, ok := <-q.jobs:
-			if !ok {
-				return
+		case <-t.C:
+			for {
+				job, ok, err := c.claim(ctx)
+				if err != nil {
+					if ctx.Err() == nil {
+						log.Error("claim job", "err", err)
+					}
+					break
+				}
+				if !ok {
+					break
+				}
+				c.handle(ctx, log, job)
 			}
-			q.process(ctx, id, job)
 		}
 	}
 }
 
-type desiredVersion struct {
-	Version string
-	Ref     git.Ref
+func (c *Consumer) claim(ctx context.Context) (models.SyncJob, bool, error) {
+	var job models.SyncJob
+	err := c.db.WithContext(ctx).Raw(`
+UPDATE sync_jobs SET status = ?, locked_at = now(), locked_by = ?, updated_at = now()
+WHERE id = (
+	SELECT id FROM sync_jobs
+	WHERE status = ? AND run_after <= now()
+	ORDER BY created_at
+	FOR UPDATE SKIP LOCKED
+	LIMIT 1
+)
+RETURNING *`, models.SyncJobRunning, c.id, models.SyncJobPending).Scan(&job).Error
+	if err != nil {
+		return models.SyncJob{}, false, err
+	}
+	if job.ID == uuid.Nil {
+		return models.SyncJob{}, false, nil
+	}
+	return job, true, nil
 }
 
-func (q *Queue) process(ctx context.Context, workerID int, job SyncJob) {
-	log := slog.With("worker", workerID, "addon", job.Name)
-	log.Info("sync", "git_url", job.GitURL, "trigger", job.Trigger)
+func (c *Consumer) handle(ctx context.Context, log *slog.Logger, job models.SyncJob) {
+	log = log.With("addon", job.Name, "job", job.ID, "trigger", job.Trigger)
+	log.Info("sync start", "git_url", job.GitURL)
 
-	cloneURL, err := q.resolveCloneURL(ctx, job)
-	if err != nil {
-		log.Error("resolve clone url", "err", err)
+	if err := c.process(ctx, log, job); err != nil {
+		attempts := job.Attempts + 1
+		updates := map[string]any{
+			"attempts":   attempts,
+			"last_error": auth.RedactURLCredentials(err.Error()),
+			"locked_at":  nil,
+			"locked_by":  "",
+			"updated_at": time.Now(),
+		}
+		if attempts >= job.MaxAttempts {
+			updates["status"] = models.SyncJobFailed
+			log.Error("sync failed permanently", "attempts", attempts, "err", err)
+		} else {
+			updates["status"] = models.SyncJobPending
+			updates["run_after"] = time.Now().Add(time.Duration(attempts) * 30 * time.Second)
+			log.Warn("sync failed, will retry", "attempts", attempts, "err", err)
+		}
+		c.db.Model(&models.SyncJob{}).Where("id = ?", job.ID).Updates(updates)
 		return
+	}
+
+	c.db.Where("id = ?", job.ID).Delete(&models.SyncJob{})
+	log.Info("sync done")
+}
+
+func (c *Consumer) process(ctx context.Context, log *slog.Logger, job models.SyncJob) error {
+	cloneURL, err := c.resolveCloneURL(ctx, job.GitURL, job.IntegrationID)
+	if err != nil {
+		return fmt.Errorf("resolve clone url: %w", err)
 	}
 
 	refs, err := git.LsRemote(cloneURL)
 	if err != nil {
-		log.Error("ls-remote", "err", err)
-		return
+		return fmt.Errorf("ls-remote: %w", err)
 	}
 
 	desired := planVersions(refs)
 	if len(desired) == 0 {
 		log.Info("no buildable refs")
-		return
+		return nil
 	}
 
 	for _, d := range desired {
-		if err := q.buildVersion(ctx, job, cloneURL, d); err != nil {
-			log.Error("build", "version", d.Version, "err", err)
+		if err := c.buildVersion(ctx, job, cloneURL, d); err != nil {
+			log.Error("build version", "version", d.Version, "err", err)
 		}
 	}
+	return nil
+}
+
+type desiredVersion struct {
+	Version string
+	Ref     git.Ref
 }
 
 func planVersions(refs []git.Ref) []desiredVersion {
@@ -132,13 +184,13 @@ func planVersions(refs []git.Ref) []desiredVersion {
 	return out
 }
 
-func (q *Queue) buildVersion(ctx context.Context, job SyncJob, cloneURL string, d desiredVersion) error {
+func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, cloneURL string, d desiredVersion) error {
 	refType := models.RefTypeTag
 	if d.Ref.Type == git.RefBranch {
 		refType = models.RefTypeBranch
 	}
 
-	existing, err := q.versionRepo.Get(job.AddonID, d.Version)
+	existing, err := c.versionRepo.Get(job.AddonID, d.Version)
 	if err != nil && !errors.Is(err, repository.ErrNotFound) {
 		return fmt.Errorf("lookup existing: %w", err)
 	}
@@ -150,7 +202,7 @@ func (q *Queue) buildVersion(ctx context.Context, job SyncJob, cloneURL string, 
 			return nil
 		}
 		if existing.Status == models.StatusReady && existing.RefValue == d.Ref.SHA {
-			if rc, err := q.storage.Get(ctx, existing.StorageKey); err == nil {
+			if rc, err := c.storage.Get(ctx, existing.StorageKey); err == nil {
 				rc.Close()
 				return nil
 			}
@@ -165,40 +217,40 @@ func (q *Queue) buildVersion(ctx context.Context, job SyncJob, cloneURL string, 
 		RefValue: d.Ref.SHA,
 		Status:   models.StatusBuilding,
 	}
-	if err := q.versionRepo.Upsert(av); err != nil {
+	if err := c.versionRepo.Upsert(av); err != nil {
 		return fmt.Errorf("mark building: %w", err)
 	}
 
 	rootDir := moduleDir(job.Name, job.Subpath)
 	archive, err := git.CloneAndZip(cloneURL, d.Ref.Name, rootDir, job.Subpath)
 	if err != nil {
-		_ = q.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
+		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
 		return err
 	}
 	defer os.Remove(archive.ZipPath)
 
 	f, err := os.Open(archive.ZipPath)
 	if err != nil {
-		_ = q.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
+		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
 		return err
 	}
 	defer f.Close()
 
 	keyName := strings.ReplaceAll(d.Version+"-"+d.Ref.SHA, "/", "-")
 	key := fmt.Sprintf("packages/%s/%s.zip", job.AddonID, keyName)
-	if err := q.storage.Put(ctx, key, f, storage.PutOptions{ContentType: "application/zip"}); err != nil {
-		_ = q.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
+	if err := c.storage.Put(ctx, key, f, storage.PutOptions{ContentType: "application/zip"}); err != nil {
+		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
 		return err
 	}
 
-	if err := q.versionRepo.SetReady(av.ID, key, "sha256:"+archive.ContentHash, archive.SizeBytes); err != nil {
+	if err := c.versionRepo.SetReady(av.ID, key, "sha256:"+archive.ContentHash, archive.SizeBytes); err != nil {
 		return fmt.Errorf("mark ready: %w", err)
 	}
 
 	html, err := markdown.Render(archive.Readme)
 	if err != nil {
 		slog.Warn("render readme", "addon", job.Name, "version", d.Version, "err", err)
-	} else if err := q.versionRepo.SetReadme(av.ID, html); err != nil {
+	} else if err := c.versionRepo.SetReadme(av.ID, html); err != nil {
 		slog.Warn("store readme", "addon", job.Name, "version", d.Version, "err", err)
 	}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
 
@@ -12,20 +11,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
+	"github.com/wimwenigerkind/odoopack-registry/internal/bootstrap"
 	"github.com/wimwenigerkind/odoopack-registry/internal/config"
 	"github.com/wimwenigerkind/odoopack-registry/internal/database"
 	"github.com/wimwenigerkind/odoopack-registry/internal/handler"
 	"github.com/wimwenigerkind/odoopack-registry/internal/logger"
 	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
-	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
 	"github.com/wimwenigerkind/odoopack-registry/internal/worker"
 )
-
-func fatal(msg string, err error) {
-	slog.Error(msg, "err", err)
-	os.Exit(1)
-}
 
 func main() {
 	config.LoadConfig()
@@ -33,15 +27,15 @@ func main() {
 
 	db, err := database.Connect(viper.GetString("database.dsn"))
 	if err != nil {
-		fatal("database connect", err)
+		bootstrap.Fatal("database connect", err)
 	}
 	if err := database.Migrate(db); err != nil {
-		fatal("database migrate", err)
+		bootstrap.Fatal("database migrate", err)
 	}
 
-	store, err := buildStorage()
+	store, err := bootstrap.Storage()
 	if err != nil {
-		fatal("storage", err)
+		bootstrap.Fatal("storage", err)
 	}
 
 	addonRepo := repository.NewAddonRepository(db)
@@ -57,27 +51,27 @@ func main() {
 
 	authProviders, err := auth.LoadProviders(ctx, viper.GetString("base_url"))
 	if err != nil {
-		fatal("auth providers", err)
+		bootstrap.Fatal("auth providers", err)
 	}
 	authRegistry := auth.NewRegistry(authProviders)
 
-	queue := worker.NewQueue(versionRepo, integrationRepo, authRegistry, store, viper.GetInt("worker.queue_size"))
-	queue.Start(ctx, viper.GetInt("worker.count"))
-	stateStore, err := buildStateStore()
+	queue := worker.NewQueue(db)
+
+	stateStore, err := bootstrap.StateStore()
 	if err != nil {
-		fatal("state store", err)
+		bootstrap.Fatal("state store", err)
 	}
 	defer stateStore.Stop()
-	sessionStore, err := buildSessionStore()
+	sessionStore, err := bootstrap.SessionStore()
 	if err != nil {
-		fatal("session store", err)
+		bootstrap.Fatal("session store", err)
 	}
 	defer sessionStore.Stop()
 
 	mode := viper.GetString("instance.mode")
 	baseURL := strings.TrimSpace(viper.GetString("base_url"))
 	if baseURL == "" {
-		fatal("config", fmt.Errorf("base_url must be set"))
+		bootstrap.Fatal("config", fmt.Errorf("base_url must be set"))
 	}
 	addonHandler := handler.NewAddonHandler(addonRepo, repoRepo, versionRepo, groupRepo, userRepo, integrationRepo, store, mode)
 	repoHandler := handler.NewRepoHandler(repoRepo, addonRepo, groupRepo, userRepo, integrationRepo, mode)
@@ -104,7 +98,7 @@ func main() {
 	}
 
 	if err := r.SetTrustedProxies(nil); err != nil {
-		fatal("trusted proxies", err)
+		bootstrap.Fatal("trusted proxies", err)
 	}
 	requireAuth := middleware.RequireAuth(sessionStore)
 	requireAdmin := middleware.RequireAdmin(sessionStore, userRepo)
@@ -129,52 +123,9 @@ func main() {
 	r.GET("/readyz", healthHandler.Ready)
 
 	addr := viper.GetString("server_address")
-	slog.Info("starting server", "addr", addr)
+	slog.Info("starting web server", "addr", addr)
 	if err := r.Run(addr); err != nil {
-		fatal("server", err)
-	}
-}
-
-func buildStorage() (storage.Storage, error) {
-	switch viper.GetString("storage.driver") {
-	case "local":
-		return storage.NewLocalStorage(viper.GetString("storage.local.root"))
-	case "s3":
-		return storage.NewS3Storage(storage.S3Config{
-			Endpoint:        viper.GetString("storage.s3.endpoint"),
-			Region:          viper.GetString("storage.s3.region"),
-			Bucket:          viper.GetString("storage.s3.bucket"),
-			AccessKeyID:     viper.GetString("storage.s3.access_key_id"),
-			SecretAccessKey: viper.GetString("storage.s3.secret_access_key"),
-			UseSSL:          viper.GetBool("storage.s3.use_ssl"),
-			UsePathStyle:    viper.GetBool("storage.s3.use_path_style"),
-			Prefix:          viper.GetString("storage.s3.prefix"),
-			PresignTTL:      viper.GetDuration("storage.s3.presign_ttl"),
-		})
-	default:
-		return nil, fmt.Errorf("unsupported storage driver %q", viper.GetString("storage.driver"))
-	}
-}
-
-func buildStateStore() (auth.StateStore, error) {
-	switch viper.GetString("session.store") {
-	case "", "memory":
-		return auth.NewMemoryStateStore(), nil
-	case "redis":
-		return auth.NewRedisStateStore(viper.GetString("redis.url"))
-	default:
-		return nil, fmt.Errorf("unsupported session store %q", viper.GetString("session.store"))
-	}
-}
-
-func buildSessionStore() (auth.SessionStore, error) {
-	switch viper.GetString("session.store") {
-	case "", "memory":
-		return auth.NewMemorySessionStore(), nil
-	case "redis":
-		return auth.NewRedisSessionStore(viper.GetString("redis.url"))
-	default:
-		return nil, fmt.Errorf("unsupported session store %q", viper.GetString("session.store"))
+		bootstrap.Fatal("server", err)
 	}
 }
 

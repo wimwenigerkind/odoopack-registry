@@ -3,9 +3,10 @@ package worker
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
 )
 
-func (q *Queue) resolveCloneURL(ctx context.Context, job SyncJob) (string, error) {
-	return auth.ResolveCloneURL(ctx, q.authRegistry, q.integrationRepo, job.GitURL, job.IntegrationID)
+func (c *Consumer) resolveCloneURL(ctx context.Context, gitURL string, integrationID *uuid.UUID) (string, error) {
+	return auth.ResolveCloneURL(ctx, c.authRegistry, c.integrationRepo, gitURL, integrationID)
 }

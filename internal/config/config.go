@@ -37,7 +37,7 @@ func LoadConfig() {
 	viper.SetDefault("redis.url", "redis://localhost:6379/0")
 
 	viper.SetDefault("worker.count", 2)
-	viper.SetDefault("worker.queue_size", 64)
+	viper.SetDefault("worker.poll_interval", "2s")
 
 	viper.SetDefault("log.level", "info")
 
