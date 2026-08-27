@@ -96,6 +96,8 @@ export interface AddonVersion {
   size_bytes?: number
   build_error?: string
   built_at?: string | null
+  series?: string
+  is_latest: boolean
 }
 
 export interface ReadmeResponse {

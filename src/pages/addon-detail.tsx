@@ -171,7 +171,12 @@ export default function AddonDetailPage() {
             <TBody>
               {versions.map((v) => (
                 <TR key={v.id}>
-                  <TD className="font-medium">{v.version}</TD>
+                  <TD className="font-medium">
+                    <span className="inline-flex items-center gap-2">
+                      {v.version}
+                      {v.is_latest && <Badge variant="success">latest</Badge>}
+                    </span>
+                  </TD>
                   <TD className="text-muted">
                     <span className="text-xs">{v.ref_type}</span>{" "}
                     <code className="text-xs">{v.ref_value.slice(0, 8)}</code>
@@ -295,7 +300,9 @@ function ReadmeSection({
 }) {
   const readable = useMemo(() => latestFirst(versions), [versions])
   const [selected, setSelected] = useState("")
-  const version = selected || readable[0]?.version || ""
+  const defaultVersion =
+    readable.find((v) => v.is_latest)?.version ?? readable[0]?.version ?? ""
+  const version = selected || defaultVersion
   const { data, isLoading, isError } = useAddonReadme(addonId, version)
 
   if (readable.length === 0) return null
