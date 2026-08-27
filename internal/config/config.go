@@ -36,8 +36,11 @@ func LoadConfig() {
 	viper.SetDefault("session.store", "memory") // "memory" or "redis"
 	viper.SetDefault("redis.url", "redis://localhost:6379/0")
 
+	viper.SetDefault("auto_migrate", true)
+
 	viper.SetDefault("worker.count", 2)
 	viper.SetDefault("worker.poll_interval", "2s")
+	viper.SetDefault("worker.health_address", "")
 
 	viper.SetDefault("log.level", "info")
 

@@ -2,9 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -29,8 +34,10 @@ func main() {
 	if err != nil {
 		bootstrap.Fatal("database connect", err)
 	}
-	if err := database.Migrate(db); err != nil {
-		bootstrap.Fatal("database migrate", err)
+	if viper.GetBool("auto_migrate") {
+		if err := database.Migrate(db); err != nil {
+			bootstrap.Fatal("database migrate", err)
+		}
 	}
 
 	store, err := bootstrap.Storage()
@@ -123,9 +130,26 @@ func main() {
 	r.GET("/readyz", healthHandler.Ready)
 
 	addr := viper.GetString("server_address")
-	slog.Info("starting web server", "addr", addr)
-	if err := r.Run(addr); err != nil {
-		bootstrap.Fatal("server", err)
+	srv := &http.Server{Addr: addr, Handler: r}
+
+	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		slog.Info("starting web server", "addr", addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			bootstrap.Fatal("server", err)
+		}
+	}()
+
+	<-sigCtx.Done()
+	stop()
+	slog.Info("web shutting down")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("graceful shutdown failed", "error", err)
 	}
 }
 
