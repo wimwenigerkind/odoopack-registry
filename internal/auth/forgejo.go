@@ -133,13 +133,13 @@ func (p *ForgejoProvider) FetchAccountName(ctx context.Context, accessToken stri
 
 func (p *ForgejoProvider) AuthenticateGitURL(repoURL, accessToken string) string {
 	sshPrefix := "git@" + p.host + ":"
-	if strings.HasPrefix(repoURL, sshPrefix) {
-		path := strings.TrimPrefix(repoURL, sshPrefix)
+	if after, ok := strings.CutPrefix(repoURL, sshPrefix); ok {
+		path := after
 		return fmt.Sprintf("https://%s@%s/%s", url.QueryEscape(accessToken), p.host, path)
 	}
 	sshURLPrefix := "ssh://git@" + p.host + "/"
-	if strings.HasPrefix(repoURL, sshURLPrefix) {
-		path := strings.TrimPrefix(repoURL, sshURLPrefix)
+	if after, ok := strings.CutPrefix(repoURL, sshURLPrefix); ok {
+		path := after
 		return fmt.Sprintf("https://%s@%s/%s", url.QueryEscape(accessToken), p.host, path)
 	}
 	u, err := url.Parse(repoURL)

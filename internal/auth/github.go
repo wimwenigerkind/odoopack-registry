@@ -109,8 +109,8 @@ func (p *GitHubProvider) FetchAccountName(ctx context.Context, accessToken strin
 }
 
 func (p *GitHubProvider) AuthenticateGitURL(repoURL, accessToken string) string {
-	if strings.HasPrefix(repoURL, "git@github.com:") {
-		path := strings.TrimPrefix(repoURL, "git@github.com:")
+	if after, ok := strings.CutPrefix(repoURL, "git@github.com:"); ok {
+		path := after
 		return fmt.Sprintf("https://oauth2:%s@github.com/%s", accessToken, path)
 	}
 	u, err := url.Parse(repoURL)

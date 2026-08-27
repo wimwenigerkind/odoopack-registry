@@ -111,12 +111,12 @@ func (p *BitbucketProvider) FetchAccountName(ctx context.Context, accessToken st
 }
 
 func (p *BitbucketProvider) AuthenticateGitURL(repoURL, accessToken string) string {
-	if strings.HasPrefix(repoURL, "git@bitbucket.org:") {
-		path := strings.TrimPrefix(repoURL, "git@bitbucket.org:")
+	if after, ok := strings.CutPrefix(repoURL, "git@bitbucket.org:"); ok {
+		path := after
 		return fmt.Sprintf("https://x-token-auth:%s@bitbucket.org/%s", accessToken, path)
 	}
-	if strings.HasPrefix(repoURL, "ssh://git@bitbucket.org/") {
-		path := strings.TrimPrefix(repoURL, "ssh://git@bitbucket.org/")
+	if after, ok := strings.CutPrefix(repoURL, "ssh://git@bitbucket.org/"); ok {
+		path := after
 		return fmt.Sprintf("https://x-token-auth:%s@bitbucket.org/%s", accessToken, path)
 	}
 	u, err := url.Parse(repoURL)

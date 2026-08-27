@@ -59,8 +59,8 @@ func LsRemote(url string) ([]Ref, error) {
 			})
 		case strings.HasPrefix(ref, "refs/tags/"):
 			name := strings.TrimPrefix(ref, "refs/tags/")
-			if strings.HasSuffix(name, "^{}") {
-				name = strings.TrimSuffix(name, "^{}")
+			if before, ok := strings.CutSuffix(name, "^{}"); ok {
+				name = before
 				e, ok := tags[name]
 				if !ok {
 					e = &tagEntry{}

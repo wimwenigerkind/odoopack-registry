@@ -99,7 +99,7 @@ func collectProviderNames() []string {
 		}
 	}
 
-	for _, name := range strings.Split(viper.GetString("auth.providers"), ",") {
+	for name := range strings.SplitSeq(viper.GetString("auth.providers"), ",") {
 		name = strings.TrimSpace(name)
 		if name == "" || seen[name] {
 			continue
