@@ -85,7 +85,7 @@ func (h *RegistryHandler) Get(c *gin.Context) {
 		versions = append(versions, registryVersion{
 			Version:   v.Version,
 			Type:      "zip",
-			URL:       fmt.Sprintf("%s/registry/v1/zipball/%s/%s", h.baseURL, addon.ID, v.RefValue),
+			URL:       fmt.Sprintf("%s/registry/v1/zipball/%s/%s", h.baseURL, addon.ID, strings.TrimPrefix(v.ContentHash, "sha256:")),
 			Shasum:    v.ContentHash,
 			Reference: v.RefValue,
 		})
@@ -105,7 +105,6 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid reference"})
 		return
 	}
-
 	addon, err := h.addons.GetByID(id)
 	if errors.Is(err, repository.ErrNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
@@ -118,6 +117,19 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 	if !canReadAddon(c, addon, h.groups, h.users, h.mode) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
 		return
+	}
+
+	wantHash := "sha256:" + reference
+	for i := range addon.Versions {
+		av := &addon.Versions[i]
+		if av.Status == models.StatusReady && av.ContentHash == wantHash {
+			if rc, err := h.storage.Get(context.Background(), av.StorageKey); err == nil {
+				streamZip(c, rc, addon.Name, av.Version, av.RefValue)
+				return
+			}
+			c.JSON(http.StatusNotFound, gin.H{"error": "artifact unavailable"})
+			return
+		}
 	}
 
 	for i := range addon.Versions {
@@ -180,6 +192,14 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 	}
 	defer os.Remove(archive.ZipPath)
 
+	gotHash := "sha256:" + archive.ContentHash
+	if expected := expectedContentHash(addon.Versions, reference); expected != "" && gotHash != expected {
+		slog.Warn("on-demand rebuild hash mismatch, refusing to serve",
+			"sha", reference, "expected", expected, "got", gotHash)
+		c.JSON(http.StatusConflict, gin.H{"error": "artifact unavailable: rebuilt content does not match the published checksum"})
+		return
+	}
+
 	if f, err := os.Open(archive.ZipPath); err == nil {
 		_ = h.storage.Put(ctx, pinnedKey, f, storage.PutOptions{ContentType: "application/zip"})
 		f.Close()
@@ -191,6 +211,16 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 		return
 	}
 	streamZip(c, f, addon.Name, "pinned", reference)
+}
+
+func expectedContentHash(versions []models.AddonVersion, reference string) string {
+	for i := range versions {
+		v := &versions[i]
+		if v.RefValue == reference {
+			return v.ContentHash
+		}
+	}
+	return ""
 }
 
 func packageStorageKey(addonID uuid.UUID, version, sha string) string {
