@@ -51,6 +51,8 @@ type AddonVersion struct {
 	SizeBytes   int64         `json:"size_bytes,omitempty"`
 	BuildError  string        `json:"build_error,omitempty"`
 	BuiltAt     *time.Time    `json:"built_at,omitempty"`
+	Series      string        `gorm:"-" json:"series,omitempty"`
+	IsLatest    bool          `gorm:"-" json:"is_latest"`
 }
 
 type AddonVersionReadme struct {

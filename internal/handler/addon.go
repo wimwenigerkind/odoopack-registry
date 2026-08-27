@@ -63,6 +63,7 @@ func (h *AddonHandler) Get(c *gin.Context) {
 	if addon.Repo != nil {
 		sanitizeOwner(addon.Repo.Owner)
 	}
+	annotateVersions(addon.Versions)
 	c.JSON(http.StatusOK, addon)
 }
 
@@ -76,6 +77,7 @@ func (h *AddonHandler) List(c *gin.Context) {
 		if addons[i].Repo != nil {
 			sanitizeOwner(addons[i].Repo.Owner)
 		}
+		annotateVersions(addons[i].Versions)
 	}
 	c.JSON(http.StatusOK, addons)
 }
