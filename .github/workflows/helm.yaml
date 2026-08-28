@@ -1,0 +1,38 @@
+name: Helm Chart
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "charts/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: helm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-chart:
+    name: Package and Push Chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: azure/setup-helm@v4
+
+      - name: Lint
+        run: helm lint charts/odoopack
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Package
+        run: helm package charts/odoopack --destination dist
+
+      - name: Push
+        run: helm push dist/odoopack-*.tgz oci://ghcr.io/${{ github.repository_owner }}/charts

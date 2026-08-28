@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "odoopack.fullname" . }}-test-connection
+  labels:
+    {{- include "odoopack.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+spec:
+  restartPolicy: Never
+  containers:
+    - name: healthz
+      image: busybox:1.37
+      command: ["wget"]
+      args:
+        - "--spider"
+        - "-S"
+        - "http://{{ include "odoopack.fullname" . }}-web:{{ .Values.web.service.port }}/healthz"

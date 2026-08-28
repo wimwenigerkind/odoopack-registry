@@ -1,0 +1,137 @@
+# Default values for odoopack.
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Backend image, shared by the web, worker and migration workloads.
+image:
+  registry: ghcr.io
+  repository: wimwenigerkind/odoopack-registry-backend
+  # Pin to a main-<sha> tag for reproducible deploys.
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podSecurityContext: {}
+
+securityContext: {}
+
+# HTTP API server.
+web:
+  replicaCount: 1
+  port: 6969
+  resources: {}
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  service:
+    type: ClusterIP
+    port: 6969
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 80
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+
+# Background worker that clones repos and builds zipballs.
+worker:
+  replicaCount: 1
+  healthPort: 6970
+  resources: {}
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+
+# Static frontend served by nginx.
+frontend:
+  enabled: true
+  image:
+    registry: ghcr.io
+    repository: wimwenigerkind/odoopack-registry-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  port: 80
+  resources: {}
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  service:
+    type: ClusterIP
+    port: 80
+
+# Database migrations run once per release as a pre-upgrade Job.
+# When enabled the web pods skip auto-migration (AUTO_MIGRATE=false).
+migration:
+  enabled: true
+  backoffLimit: 3
+  resources: {}
+  annotations: {}
+
+# Non-secret application config, rendered to config.yaml and read by viper.
+config:
+  base_url: "http://localhost"
+  instance:
+    mode: public
+  cors:
+    allowed_origins: []
+  storage:
+    driver: s3
+    s3:
+      endpoint: ""
+      region: us-east-1
+      bucket: ""
+      access_key_id: ""
+      use_ssl: true
+      use_path_style: false
+      prefix: ""
+      presign_ttl: 5m
+  session:
+    store: memory
+  auth:
+    cookie_secure: true
+  log:
+    level: info
+
+# Deep-merged over config above; use for auth providers and overrides.
+extraConfig: {}
+
+# Secret env vars (DATABASE_DSN, STORAGE_S3_SECRET_ACCESS_KEY, REDIS_URL,
+# AUTH_<PROVIDER>_CLIENT_SECRET). Rendered into a Secret unless existingSecret is set.
+secrets: {}
+existingSecret: ""
+
+extraEnv: []
+extraEnvFrom: []
+
+# Path-based ingress: backendPaths route to the web service, everything else to the frontend.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: ""
+  tls: []
+  backendPaths:
+    - /api
+    - /registry
+    - /auth
+    - /integrations
+    - /webhooks
+    - /healthz
+    - /readyz

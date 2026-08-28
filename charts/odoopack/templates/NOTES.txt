@@ -1,0 +1,34 @@
+odoopack has been deployed.
+
+Release:   {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+Components:
+  web      Deployment/{{ include "odoopack.fullname" . }}-web
+  worker   Deployment/{{ include "odoopack.fullname" . }}-worker
+{{- if .Values.frontend.enabled }}
+  frontend Deployment/{{ include "odoopack.fullname" . }}-frontend
+{{- end }}
+{{- if .Values.migration.enabled }}
+  migrate  Job (pre-install,pre-upgrade hook)
+{{- end }}
+
+{{- if .Values.ingress.enabled }}
+
+Reachable at: http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}
+{{- else }}
+
+No ingress is enabled. Port-forward the web API with:
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "odoopack.fullname" . }}-web {{ .Values.web.service.port }}:{{ .Values.web.service.port }}
+{{- end }}
+
+Checklist:
+{{- if not (include "odoopack.hasSecret" .) }}
+  ! No database credentials set. Provide secrets.DATABASE_DSN or existingSecret.
+{{- end }}
+{{- if and (eq .Values.config.storage.driver "s3") (not .Values.config.storage.s3.bucket) }}
+  ! storage.driver is s3 but no bucket is configured (config.storage.s3.bucket).
+{{- end }}
+{{- if eq .Values.config.base_url "http://localhost" }}
+  ! config.base_url is still the default; set it to your public URL.
+{{- end }}
