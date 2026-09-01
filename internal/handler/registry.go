@@ -47,11 +47,18 @@ func NewRegistryHandler(addons *repository.AddonRepository, groups *repository.G
 }
 
 type registryVersion struct {
-	Version   string `json:"version"`
-	Type      string `json:"type"`
-	URL       string `json:"url"`
-	Shasum    string `json:"shasum,omitempty"`
-	Reference string `json:"reference,omitempty"`
+	Version   string        `json:"version"`
+	Type      string        `json:"type"`
+	URL       string        `json:"url"`
+	Shasum    string        `json:"shasum,omitempty"`
+	Reference string        `json:"reference,omitempty"`
+	Depends   []registryDep `json:"depends,omitempty"`
+}
+
+type registryDep struct {
+	Module  string `json:"module"`
+	Package string `json:"package,omitempty"`
+	Access  string `json:"access"`
 }
 
 var referenceRe = regexp.MustCompile(`^[0-9a-fA-F]{7,64}$`)
@@ -77,10 +84,19 @@ func (h *RegistryHandler) Get(c *gin.Context) {
 		return
 	}
 
+	if visible, err := h.addons.ListVisibleTo(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), ""); err == nil {
+		allNames, _ := h.addons.ListAllNames()
+		resolveDepends(addon.Versions, visible, allNames)
+	}
+
 	versions := make([]registryVersion, 0, len(addon.Versions))
 	for _, v := range addon.Versions {
 		if v.Status != models.StatusReady {
 			continue
+		}
+		deps := make([]registryDep, 0, len(v.DependsResolved))
+		for _, rd := range v.DependsResolved {
+			deps = append(deps, registryDep{Module: rd.Module, Package: rd.Name, Access: rd.Access})
 		}
 		versions = append(versions, registryVersion{
 			Version:   v.Version,
@@ -88,6 +104,7 @@ func (h *RegistryHandler) Get(c *gin.Context) {
 			URL:       fmt.Sprintf("%s/registry/v1/zipball/%s/%s", h.baseURL, addon.ID, strings.TrimPrefix(v.ContentHash, "sha256:")),
 			Shasum:    v.ContentHash,
 			Reference: v.RefValue,
+			Depends:   deps,
 		})
 	}
 
