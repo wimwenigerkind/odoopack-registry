@@ -229,17 +229,6 @@ func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, cloneUR
 	}
 	defer os.Remove(archive.ZipPath)
 
-	if refType == models.RefTypeTag && archive.Manifest != nil {
-		mv := strings.TrimSpace(archive.Manifest.Version)
-		mv = strings.TrimPrefix(mv, "v")
-		mv = strings.TrimPrefix(mv, "V")
-		if mv != "" && mv != d.Version {
-			msg := fmt.Sprintf("git tag %s does not match manifest version %s", d.Ref.Name, archive.Manifest.Version)
-			_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, msg)
-			return fmt.Errorf("%s", msg)
-		}
-	}
-
 	f, err := os.Open(archive.ZipPath)
 	if err != nil {
 		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
