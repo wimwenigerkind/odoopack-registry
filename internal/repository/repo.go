@@ -73,7 +73,8 @@ func (r *RepoRepository) ListByOwner(ownerID uuid.UUID) ([]models.Repo, error) {
 }
 
 func (r *RepoRepository) Update(repo *models.Repo) error {
-	return r.db.Model(repo).Select("default_branch", "integration_id").Updates(map[string]any{
+	return r.db.Model(repo).Select("git_url", "default_branch", "integration_id").Updates(map[string]any{
+		"git_url":        repo.GitURL,
 		"default_branch": repo.DefaultBranch,
 		"integration_id": repo.IntegrationID,
 	}).Error
