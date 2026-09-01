@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Boxes,
   Download,
   FileText,
   Package,
@@ -31,6 +32,7 @@ import {
   TR,
 } from "@/components/ui"
 import { useAddon } from "@/hooks/addons/use-addon"
+import { useAddons } from "@/hooks/addons/use-addons"
 import { useAddonReadme } from "@/hooks/addons/use-addon-readme"
 import { useDeleteAddon } from "@/hooks/addons/use-delete-addon"
 import { useDeleteVersion } from "@/hooks/addons/use-delete-version"
@@ -143,6 +145,8 @@ export default function AddonDetailPage() {
           </Detail>
         </dl>
       </Card>
+
+      <RequiresSection versions={versions} />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">
@@ -266,6 +270,53 @@ export default function AddonDetailPage() {
         </Card>
       )}
     </div>
+  )
+}
+
+function RequiresSection({ versions }: { versions: AddonVersion[] }) {
+  const { data: allAddons } = useAddons()
+  const target =
+    versions.find((v) => v.is_latest) ??
+    versions.find((v) => v.status === "ready") ??
+    versions[0]
+  const depends = target?.depends ?? []
+  if (depends.length === 0) return null
+
+  const byName = new Map((allAddons ?? []).map((a) => [a.name, a.id]))
+
+  return (
+    <Card>
+      <div className="flex items-center gap-2 border-b border-border p-4 font-medium">
+        <Boxes className="size-4 text-muted" />
+        Requires
+        <span className="font-normal text-muted">({depends.length})</span>
+        {target?.version && (
+          <span className="ml-auto text-xs font-normal text-muted">
+            for {target.version}
+          </span>
+        )}
+      </div>
+      <ul className="divide-y divide-border">
+        {depends.map((dep) => {
+          const id = byName.get(dep)
+          return (
+            <li
+              key={dep}
+              className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
+            >
+              {id ? (
+                <Link to={`/addons/${id}`} className="font-mono text-accent">
+                  {dep}
+                </Link>
+              ) : (
+                <code className="font-mono text-muted">{dep}</code>
+              )}
+              {!id && <Badge variant="neutral">external</Badge>}
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
   )
 }
 
