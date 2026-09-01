@@ -148,6 +148,8 @@ github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 github.com/ugorji/go/codec v1.3.1 h1:waO7eEiFDwidsBN6agj1vJQ4AG7lh2yqXyOXqhgQuyY=
 github.com/ugorji/go/codec v1.3.1/go.mod h1:pRBVtBSKl77K30Bv8R2P+cLSGaTtex6fsA2Wjqmfxj4=
+github.com/wimwenigerkind/odoo-manifest v0.0.0-20260901165831-fc817747335b h1:Q/302Z8GOYnMEcacq3fs3fkIX46QWMU8PrcLPCkwtWI=
+github.com/wimwenigerkind/odoo-manifest v0.0.0-20260901165831-fc817747335b/go.mod h1:Ok8Ze1U0875O+R0bc+JhX1W03K2EVq8VSHTjiqm6UBI=
 github.com/wimwenigerkind/odoopack-semver v0.0.0-20260827211541-1f15691b59d7 h1:SM55SiMBczpJtPUnq58IdXCHPL7sdGu1ecbBt+/U0GY=
 github.com/wimwenigerkind/odoopack-semver v0.0.0-20260827211541-1f15691b59d7/go.mod h1:iYEOqAGaBCW75BTUyRP/y83G+cSNEXrexN7MaTpWKoc=
 github.com/yuin/goldmark v1.8.5 h1:r6N5afV5qj/5S4UTch8agZHJ8UxNCMwX7WjkkJam2NA=

@@ -6,10 +6,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	odoomanifest "github.com/wimwenigerkind/odoo-manifest"
 )
 
 type ArchiveResult struct {
@@ -17,6 +20,7 @@ type ArchiveResult struct {
 	ContentHash string
 	SizeBytes   int64
 	Readme      string
+	Manifest    *odoomanifest.Manifest
 }
 
 func CloneAndZip(url, ref, rootDir, subpath string) (ArchiveResult, error) {
@@ -76,6 +80,7 @@ func CloneAndZip(url, ref, rootDir, subpath string) (ArchiveResult, error) {
 		ContentHash: hash,
 		SizeBytes:   info.Size(),
 		Readme:      readReadme(src, subpath),
+		Manifest:    readManifest(src, subpath),
 	}, nil
 }
 
@@ -146,6 +151,7 @@ func CloneAndZipAtSHA(url, sha, rootDir, subpath string) (ArchiveResult, error) 
 		ContentHash: hash,
 		SizeBytes:   info.Size(),
 		Readme:      readReadme(src, subpath),
+		Manifest:    readManifest(src, subpath),
 	}, nil
 }
 
@@ -171,6 +177,23 @@ func readReadme(srcDir, subpath string) string {
 		}
 	}
 	return ""
+}
+
+func readManifest(srcDir, subpath string) *odoomanifest.Manifest {
+	dir := srcDir
+	if cleaned := strings.Trim(subpath, "/"); cleaned != "" {
+		dir = filepath.Join(srcDir, cleaned)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "__manifest__.py"))
+	if err != nil {
+		return nil
+	}
+	m, err := odoomanifest.Parse(data)
+	if err != nil {
+		slog.Warn("parse manifest", "dir", dir, "err", err)
+		return nil
+	}
+	return &m
 }
 
 func runGit(workdir string, args ...string) error {

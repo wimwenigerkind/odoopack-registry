@@ -41,18 +41,20 @@ type Addon struct {
 
 type AddonVersion struct {
 	Base
-	AddonID     uuid.UUID     `gorm:"type:uuid;index:idx_addon_ref,unique;not null" json:"-"`
-	Version     string        `gorm:"index:idx_addon_ref,unique;not null" json:"version"`
-	RefType     RefType       `gorm:"not null" json:"ref_type"`
-	RefValue    string        `gorm:"not null" json:"ref_value"`
-	Status      VersionStatus `gorm:"not null;default:pending" json:"status"`
-	StorageKey  string        `json:"-"`
-	ContentHash string        `json:"content_hash,omitempty"`
-	SizeBytes   int64         `json:"size_bytes,omitempty"`
-	BuildError  string        `json:"build_error,omitempty"`
-	BuiltAt     *time.Time    `json:"built_at,omitempty"`
-	Series      string        `gorm:"-" json:"series,omitempty"`
-	IsLatest    bool          `gorm:"-" json:"is_latest"`
+	AddonID         uuid.UUID     `gorm:"type:uuid;index:idx_addon_ref,unique;not null" json:"-"`
+	Version         string        `gorm:"index:idx_addon_ref,unique;not null" json:"version"`
+	RefType         RefType       `gorm:"not null" json:"ref_type"`
+	RefValue        string        `gorm:"not null" json:"ref_value"`
+	Status          VersionStatus `gorm:"not null;default:pending" json:"status"`
+	StorageKey      string        `json:"-"`
+	ContentHash     string        `json:"content_hash,omitempty"`
+	SizeBytes       int64         `json:"size_bytes,omitempty"`
+	BuildError      string        `json:"build_error,omitempty"`
+	BuiltAt         *time.Time    `json:"built_at,omitempty"`
+	Depends         []string      `gorm:"serializer:json" json:"depends,omitempty"`
+	ManifestVersion string        `json:"manifest_version,omitempty"`
+	Series          string        `gorm:"-" json:"series,omitempty"`
+	IsLatest        bool          `gorm:"-" json:"is_latest"`
 }
 
 type AddonVersionReadme struct {

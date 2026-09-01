@@ -96,6 +96,8 @@ export interface AddonVersion {
   size_bytes?: number
   build_error?: string
   built_at?: string | null
+  depends?: string[]
+  manifest_version?: string
   series?: string
   is_latest: boolean
 }
