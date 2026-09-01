@@ -16,6 +16,7 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/git"
 	"github.com/wimwenigerkind/odoopack-registry/internal/markdown"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
+	"github.com/wimwenigerkind/odoopack-registry/internal/naming"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
 	"gorm.io/gorm"
@@ -220,7 +221,7 @@ func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, cloneUR
 		return fmt.Errorf("mark building: %w", err)
 	}
 
-	rootDir := formatAddonDir(job.Name)
+	rootDir := naming.ModuleName(job.Name)
 	archive, err := git.CloneAndZip(cloneURL, d.Ref.Name, rootDir, job.Subpath)
 	if err != nil {
 		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
@@ -285,8 +286,4 @@ func normalizeVersion(tag string) (string, bool) {
 		return "", false
 	}
 	return v, true
-}
-
-func formatAddonDir(name string) string {
-	return strings.NewReplacer("/", "_", "-", "_").Replace(name)
 }

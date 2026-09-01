@@ -109,6 +109,12 @@ func (r *AddonRepository) ListByOwnerAndRepoPath(ownerID uuid.UUID, repoPath str
 	return addons, err
 }
 
+func (r *AddonRepository) ListAllNames() ([]string, error) {
+	var names []string
+	err := r.db.Model(&models.Addon{}).Pluck("name", &names).Error
+	return names, err
+}
+
 func (r *AddonRepository) ListVisibleTo(userID *uuid.UUID, isAdmin bool, nameFilter string) ([]models.Addon, error) {
 	var addons []models.Addon
 	q := r.db.

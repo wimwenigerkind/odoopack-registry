@@ -64,6 +64,10 @@ func (h *AddonHandler) Get(c *gin.Context) {
 		sanitizeOwner(addon.Repo.Owner)
 	}
 	annotateVersions(addon.Versions)
+	if visible, err := h.addons.ListVisibleTo(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), ""); err == nil {
+		allNames, _ := h.addons.ListAllNames()
+		resolveDepends(addon.Versions, visible, allNames)
+	}
 	c.JSON(http.StatusOK, addon)
 }
 

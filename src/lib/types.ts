@@ -97,9 +97,17 @@ export interface AddonVersion {
   build_error?: string
   built_at?: string | null
   depends?: string[]
+  depends_resolved?: ResolvedDep[]
   manifest_version?: string
   series?: string
   is_latest: boolean
+}
+
+export interface ResolvedDep {
+  module: string
+  addon_id?: string
+  name?: string
+  access: "ok" | "external" | "forbidden"
 }
 
 export interface ReadmeResponse {

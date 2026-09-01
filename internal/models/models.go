@@ -55,6 +55,14 @@ type AddonVersion struct {
 	ManifestVersion string        `json:"manifest_version,omitempty"`
 	Series          string        `gorm:"-" json:"series,omitempty"`
 	IsLatest        bool          `gorm:"-" json:"is_latest"`
+	DependsResolved []ResolvedDep `gorm:"-" json:"depends_resolved,omitempty"`
+}
+
+type ResolvedDep struct {
+	Module  string     `json:"module"`
+	AddonID *uuid.UUID `json:"addon_id,omitempty"`
+	Name    string     `json:"name,omitempty"`
+	Access  string     `json:"access"`
 }
 
 type AddonVersionReadme struct {

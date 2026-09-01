@@ -32,7 +32,6 @@ import {
   TR,
 } from "@/components/ui"
 import { useAddon } from "@/hooks/addons/use-addon"
-import { useAddons } from "@/hooks/addons/use-addons"
 import { useAddonReadme } from "@/hooks/addons/use-addon-readme"
 import { useDeleteAddon } from "@/hooks/addons/use-delete-addon"
 import { useDeleteVersion } from "@/hooks/addons/use-delete-version"
@@ -274,25 +273,19 @@ export default function AddonDetailPage() {
 }
 
 function RequiresSection({ versions }: { versions: AddonVersion[] }) {
-  const { data: allAddons } = useAddons()
   const target =
     versions.find((v) => v.is_latest) ??
     versions.find((v) => v.status === "ready") ??
     versions[0]
-  const depends = target?.depends ?? []
-  if (depends.length === 0) return null
-
-  const toModuleName = (n: string) => n.replace(/[/-]/g, "_")
-  const byName = new Map(
-    (allAddons ?? []).map((a) => [toModuleName(a.name), a.id]),
-  )
+  const deps = target?.depends_resolved ?? []
+  if (deps.length === 0) return null
 
   return (
     <Card>
       <div className="flex items-center gap-2 border-b border-border p-4 font-medium">
         <Boxes className="size-4 text-muted" />
         Requires
-        <span className="font-normal text-muted">({depends.length})</span>
+        <span className="font-normal text-muted">({deps.length})</span>
         {target?.version && (
           <span className="ml-auto text-xs font-normal text-muted">
             for {target.version}
@@ -300,24 +293,29 @@ function RequiresSection({ versions }: { versions: AddonVersion[] }) {
         )}
       </div>
       <ul className="divide-y divide-border">
-        {depends.map((dep) => {
-          const id = byName.get(dep)
-          return (
-            <li
-              key={dep}
-              className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
-            >
-              {id ? (
-                <Link to={`/addons/${id}`} className="font-mono text-accent">
-                  {dep}
-                </Link>
-              ) : (
-                <code className="font-mono text-muted">{dep}</code>
-              )}
-              {!id && <Badge variant="neutral">external</Badge>}
-            </li>
-          )
-        })}
+        {deps.map((dep) => (
+          <li
+            key={dep.module}
+            className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
+          >
+            {dep.addon_id ? (
+              <Link
+                to={`/addons/${dep.addon_id}`}
+                className="font-mono text-accent"
+              >
+                {dep.module}
+              </Link>
+            ) : (
+              <code className="font-mono text-muted">{dep.module}</code>
+            )}
+            {dep.access === "external" && (
+              <Badge variant="neutral">external</Badge>
+            )}
+            {dep.access === "forbidden" && (
+              <Badge variant="warning">private</Badge>
+            )}
+          </li>
+        ))}
       </ul>
     </Card>
   )
