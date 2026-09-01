@@ -11,11 +11,15 @@ import (
 const ProviderTypeEntra ProviderType = "entra"
 
 type EntraConfig struct {
-	AllowLogin    bool
-	AllowRegister bool
-	TenantID      string
-	ClientID      string
-	ClientSecret  string
+	AllowLogin          bool
+	AllowRegister       bool
+	TenantID            string
+	ClientID            string
+	ClientSecret        string
+	GroupClaimName      string
+	AdminGroup          string
+	GroupTeamMapRemoval bool
+	GroupTeamMap        map[string][]string
 }
 
 type EntraProvider struct {
@@ -55,6 +59,10 @@ func (p *EntraProvider) AllowLogin() bool          { return p.cfg.AllowLogin }
 func (p *EntraProvider) AllowRegister() bool       { return p.cfg.AllowRegister }
 func (p *EntraProvider) AllowGitIntegration() bool { return false }
 
+func (p *EntraProvider) GroupTeamMap() map[string][]string { return p.cfg.GroupTeamMap }
+func (p *EntraProvider) AdminGroup() string                { return p.cfg.AdminGroup }
+func (p *EntraProvider) GroupTeamMapRemoval() bool         { return p.cfg.GroupTeamMapRemoval }
+
 func (p *EntraProvider) LoginAuthURL(state, nonce, pkceVerifier string) string {
 	return p.oauth2.AuthCodeURL(
 		state,
@@ -93,5 +101,18 @@ func (p *EntraProvider) ExchangeLogin(ctx context.Context, code, pkceVerifier, e
 	if resolvedEmail == "" {
 		resolvedEmail = claims.PreferredUsername
 	}
-	return LoginResult{Subject: idToken.Subject, Email: resolvedEmail, EmailVerified: true}, nil
+
+	claimName := p.cfg.GroupClaimName
+	if claimName == "" {
+		claimName = "groups"
+	}
+	var allClaims map[string]any
+	_ = idToken.Claims(&allClaims)
+
+	return LoginResult{
+		Subject:       idToken.Subject,
+		Email:         resolvedEmail,
+		EmailVerified: true,
+		Groups:        stringSliceClaim(allClaims[claimName]),
+	}, nil
 }
