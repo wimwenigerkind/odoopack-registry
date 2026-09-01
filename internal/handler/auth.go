@@ -443,6 +443,30 @@ func (h *AuthHandler) completeIntegration(c *gin.Context, providerName, code str
 		slog.Warn("integration callback: fetch account name", "provider", providerName, "err", accountErr)
 	}
 
+	if accountName != "" {
+		existing, err := h.integrations.GetByOwnerProviderAccount(userID, providerName, accountName)
+		switch {
+		case err == nil:
+			existing.AccessToken = accessToken
+			existing.RefreshToken = refreshToken
+			existing.ExpiresAt = expiresAt
+			if err := h.integrations.UpdateTokens(existing); err != nil {
+				internalError(c, "update integration", err)
+				return
+			}
+			returnTo := fs.ReturnTo
+			if returnTo == "" {
+				returnTo = "/profile"
+			}
+			c.Redirect(http.StatusFound, returnTo)
+			return
+		case errors.Is(err, repository.ErrNotFound):
+		default:
+			internalError(c, "lookup integration", err)
+			return
+		}
+	}
+
 	hookSecret, err := generateSecret(32)
 	if err != nil {
 		internalError(c, "generate hook secret", err)

@@ -29,6 +29,19 @@ func (r *IntegrationRepository) ListByOwner(ownerID uuid.UUID) ([]models.OAuthIn
 	return out, err
 }
 
+func (r *IntegrationRepository) GetByOwnerProviderAccount(ownerID uuid.UUID, provider, accountName string) (*models.OAuthIntegration, error) {
+	var it models.OAuthIntegration
+	err := r.db.Where("owner_id = ? AND provider = ? AND account_name = ?", ownerID, provider, accountName).
+		First(&it).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &it, nil
+}
+
 func (r *IntegrationRepository) GetByID(id uuid.UUID) (*models.OAuthIntegration, error) {
 	var it models.OAuthIntegration
 	err := r.db.Where("id = ?", id).First(&it).Error
