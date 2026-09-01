@@ -60,20 +60,20 @@ func (p *BitbucketProvider) LoginAuthURL(state, _, _ string) string {
 	return p.oauth2.AuthCodeURL(state)
 }
 
-func (p *BitbucketProvider) ExchangeLogin(ctx context.Context, code, _, _ string) (subject, email string, emailVerified bool, err error) {
+func (p *BitbucketProvider) ExchangeLogin(ctx context.Context, code, _, _ string) (LoginResult, error) {
 	token, err := p.oauth2.Exchange(ctx, code)
 	if err != nil {
-		return "", "", false, fmt.Errorf("bitbucket token exchange: %w", err)
+		return LoginResult{}, fmt.Errorf("bitbucket token exchange: %w", err)
 	}
 	user, err := fetchBitbucketUser(ctx, token.AccessToken)
 	if err != nil {
-		return "", "", false, err
+		return LoginResult{}, err
 	}
 	primary, verified, err := fetchBitbucketPrimaryEmail(ctx, token.AccessToken)
 	if err != nil {
-		return "", "", false, err
+		return LoginResult{}, err
 	}
-	return user.UUID, primary, verified, nil
+	return LoginResult{Subject: user.UUID, Email: primary, EmailVerified: verified}, nil
 }
 
 func (p *BitbucketProvider) IntegrationAuthURL(state string) string {

@@ -46,6 +46,10 @@ func (r *UserRepository) GetByIdentity(provider, subject string) (*models.User, 
 	return r.GetByID(identity.UserID)
 }
 
+func (r *UserRepository) SetAdmin(id uuid.UUID, isAdmin bool) error {
+	return r.db.Model(&models.User{}).Where("id = ?", id).Update("is_admin", isAdmin).Error
+}
+
 func (r *UserRepository) CreateWithIdentity(user *models.User, identity *models.Identity) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(user).Error; err != nil {

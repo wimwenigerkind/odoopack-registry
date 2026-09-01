@@ -84,23 +84,23 @@ func (p *ForgejoProvider) LoginAuthURL(state, _, _ string) string {
 	return p.loginOAuth.AuthCodeURL(state)
 }
 
-func (p *ForgejoProvider) ExchangeLogin(ctx context.Context, code, _, _ string) (subject, email string, emailVerified bool, err error) {
+func (p *ForgejoProvider) ExchangeLogin(ctx context.Context, code, _, _ string) (LoginResult, error) {
 	token, err := p.loginOAuth.Exchange(ctx, code)
 	if err != nil {
-		return "", "", false, fmt.Errorf("forgejo token exchange: %w", err)
+		return LoginResult{}, fmt.Errorf("forgejo token exchange: %w", err)
 	}
 	user, err := p.fetchUser(ctx, token.AccessToken)
 	if err != nil {
-		return "", "", false, err
+		return LoginResult{}, err
 	}
 	primary, verified, err := p.fetchPrimaryEmail(ctx, token.AccessToken)
 	if err != nil {
-		return "", "", false, err
+		return LoginResult{}, err
 	}
 	if primary == "" {
 		primary = user.Email
 	}
-	return fmt.Sprintf("%d", user.ID), primary, verified, nil
+	return LoginResult{Subject: fmt.Sprintf("%d", user.ID), Email: primary, EmailVerified: verified}, nil
 }
 
 func (p *ForgejoProvider) IntegrationAuthURL(state string) string {

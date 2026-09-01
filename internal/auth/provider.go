@@ -18,11 +18,24 @@ type Provider interface {
 	AllowGitIntegration() bool
 }
 
+type LoginResult struct {
+	Subject       string
+	Email         string
+	EmailVerified bool
+	Groups        []string
+}
+
 type LoginProvider interface {
 	Provider
 	AllowRegister() bool
 	LoginAuthURL(state, nonce, pkceVerifier string) string
-	ExchangeLogin(ctx context.Context, code, pkceVerifier, expectedNonce string) (subject, email string, emailVerified bool, err error)
+	ExchangeLogin(ctx context.Context, code, pkceVerifier, expectedNonce string) (LoginResult, error)
+}
+
+type GroupMapper interface {
+	GroupTeamMap() map[string][]string
+	AdminGroup() string
+	GroupTeamMapRemoval() bool
 }
 
 type IntegrationProvider interface {

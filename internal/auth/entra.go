@@ -63,35 +63,35 @@ func (p *EntraProvider) LoginAuthURL(state, nonce, pkceVerifier string) string {
 	)
 }
 
-func (p *EntraProvider) ExchangeLogin(ctx context.Context, code, pkceVerifier, expectedNonce string) (subject, email string, emailVerified bool, err error) {
+func (p *EntraProvider) ExchangeLogin(ctx context.Context, code, pkceVerifier, expectedNonce string) (LoginResult, error) {
 	token, err := p.oauth2.Exchange(ctx, code, oauth2.VerifierOption(pkceVerifier))
 	if err != nil {
-		return "", "", false, fmt.Errorf("token exchange: %w", err)
+		return LoginResult{}, fmt.Errorf("token exchange: %w", err)
 	}
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok {
-		return "", "", false, fmt.Errorf("no id_token in token response")
+		return LoginResult{}, fmt.Errorf("no id_token in token response")
 	}
 	idToken, err := p.verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		return "", "", false, fmt.Errorf("id_token verify: %w", err)
+		return LoginResult{}, fmt.Errorf("id_token verify: %w", err)
 	}
 	if idToken.Nonce != expectedNonce {
-		return "", "", false, fmt.Errorf("nonce mismatch")
+		return LoginResult{}, fmt.Errorf("nonce mismatch")
 	}
 	if idToken.Subject == "" {
-		return "", "", false, fmt.Errorf("id_token missing subject")
+		return LoginResult{}, fmt.Errorf("id_token missing subject")
 	}
 	var claims struct {
 		Email             string `json:"email"`
 		PreferredUsername string `json:"preferred_username"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
-		return "", "", false, fmt.Errorf("parse claims: %w", err)
+		return LoginResult{}, fmt.Errorf("parse claims: %w", err)
 	}
 	resolvedEmail := claims.Email
 	if resolvedEmail == "" {
 		resolvedEmail = claims.PreferredUsername
 	}
-	return idToken.Subject, resolvedEmail, true, nil
+	return LoginResult{Subject: idToken.Subject, Email: resolvedEmail, EmailVerified: true}, nil
 }

@@ -64,20 +64,20 @@ func (p *GitHubProvider) LoginAuthURL(state, _, _ string) string {
 	return p.loginOAuth.AuthCodeURL(state)
 }
 
-func (p *GitHubProvider) ExchangeLogin(ctx context.Context, code, _, _ string) (subject, email string, emailVerified bool, err error) {
+func (p *GitHubProvider) ExchangeLogin(ctx context.Context, code, _, _ string) (LoginResult, error) {
 	token, err := p.loginOAuth.Exchange(ctx, code)
 	if err != nil {
-		return "", "", false, fmt.Errorf("github token exchange: %w", err)
+		return LoginResult{}, fmt.Errorf("github token exchange: %w", err)
 	}
 	user, err := fetchGitHubUser(ctx, token.AccessToken)
 	if err != nil {
-		return "", "", false, err
+		return LoginResult{}, err
 	}
 	primary, verified, err := fetchGitHubPrimaryEmail(ctx, token.AccessToken)
 	if err != nil {
-		return "", "", false, err
+		return LoginResult{}, err
 	}
-	return fmt.Sprintf("%d", user.ID), primary, verified, nil
+	return LoginResult{Subject: fmt.Sprintf("%d", user.ID), Email: primary, EmailVerified: verified}, nil
 }
 
 func (p *GitHubProvider) IntegrationAuthURL(state string) string {

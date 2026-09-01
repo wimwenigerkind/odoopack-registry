@@ -32,16 +32,18 @@ type AuthHandler struct {
 	stateStore   auth.StateStore
 	sessions     auth.SessionStore
 	users        *repository.UserRepository
+	groups       *repository.GroupRepository
 	integrations *repository.IntegrationRepository
 	cookieSecure bool
 }
 
-func NewAuthHandler(reg *auth.Registry, store auth.StateStore, sessions auth.SessionStore, users *repository.UserRepository, integrations *repository.IntegrationRepository, cookieSecure bool) *AuthHandler {
+func NewAuthHandler(reg *auth.Registry, store auth.StateStore, sessions auth.SessionStore, users *repository.UserRepository, groups *repository.GroupRepository, integrations *repository.IntegrationRepository, cookieSecure bool) *AuthHandler {
 	return &AuthHandler{
 		registry:     reg,
 		stateStore:   store,
 		sessions:     sessions,
 		users:        users,
+		groups:       groups,
 		integrations: integrations,
 		cookieSecure: cookieSecure,
 	}
@@ -173,14 +175,14 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 		return
 	}
 
-	subject, email, emailVerified, err := provider.ExchangeLogin(c.Request.Context(), code, fs.Verifier, fs.Nonce)
+	result, err := provider.ExchangeLogin(c.Request.Context(), code, fs.Verifier, fs.Nonce)
 	if err != nil {
 		slog.Warn("auth callback: exchange failed", "provider", providerName, "err", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication failed"})
 		return
 	}
 
-	user, err := h.findOrCreateUser(provider, subject, email, emailVerified)
+	user, err := h.findOrCreateUser(provider, result.Subject, result.Email, result.EmailVerified)
 	if err != nil {
 		switch {
 		case errors.Is(err, errRegistrationDisabled):
@@ -192,6 +194,8 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 		}
 		return
 	}
+
+	h.syncGroups(provider, user, result.Groups)
 
 	if oldCookie, err := c.Cookie(auth.SessionCookieName); err == nil && oldCookie != "" {
 		_ = h.sessions.Delete(oldCookie)
@@ -268,6 +272,76 @@ func (h *AuthHandler) findOrCreateUser(provider auth.LoginProvider, subject, ema
 	return newUser, nil
 }
 
+func (h *AuthHandler) syncGroups(provider auth.LoginProvider, user *models.User, claimGroups []string) {
+	mapper, ok := provider.(auth.GroupMapper)
+	if !ok {
+		return
+	}
+	teamMap := mapper.GroupTeamMap()
+	adminGroup := mapper.AdminGroup()
+	removal := mapper.GroupTeamMapRemoval()
+	if len(teamMap) == 0 && adminGroup == "" {
+		return
+	}
+
+	claimed := make(map[string]bool, len(claimGroups))
+	for _, g := range claimGroups {
+		claimed[g] = true
+	}
+
+	if adminGroup != "" {
+		wantAdmin := claimed[adminGroup]
+		if (wantAdmin && !user.IsAdmin) || (removal && !wantAdmin && user.IsAdmin) {
+			if err := h.users.SetAdmin(user.ID, wantAdmin); err != nil {
+				slog.Warn("group sync: set admin failed", "user", user.ID, "err", err)
+			}
+		}
+	}
+
+	desired := map[string]bool{}
+	for claim, names := range teamMap {
+		if !claimed[claim] {
+			continue
+		}
+		for _, name := range names {
+			desired[name] = true
+		}
+	}
+
+	for name := range desired {
+		g, err := h.groups.GetByName(name)
+		if err != nil {
+			slog.Warn("group sync: target group not found", "group", name, "provider", provider.Name())
+			continue
+		}
+		if err := h.groups.EnsureMember(g.ID, user.ID); err != nil {
+			slog.Warn("group sync: add member failed", "group", name, "user", user.ID, "err", err)
+		}
+	}
+
+	if !removal {
+		return
+	}
+	managed := map[string]bool{}
+	for _, names := range teamMap {
+		for _, name := range names {
+			managed[name] = true
+		}
+	}
+	for name := range managed {
+		if desired[name] {
+			continue
+		}
+		g, err := h.groups.GetByName(name)
+		if err != nil {
+			continue
+		}
+		if err := h.groups.RemoveMember(g.ID, user.ID); err != nil {
+			slog.Warn("group sync: remove member failed", "group", name, "user", user.ID, "err", err)
+		}
+	}
+}
+
 func (h *AuthHandler) completeLink(c *gin.Context, providerName, code string, fs auth.FlowState) {
 	provider, err := h.registry.GetLogin(providerName)
 	if err != nil {
@@ -280,12 +354,13 @@ func (h *AuthHandler) completeLink(c *gin.Context, providerName, code string, fs
 		return
 	}
 
-	subject, _, _, err := provider.ExchangeLogin(c.Request.Context(), code, fs.Verifier, fs.Nonce)
+	result, err := provider.ExchangeLogin(c.Request.Context(), code, fs.Verifier, fs.Nonce)
 	if err != nil {
 		slog.Warn("link callback: exchange failed", "provider", providerName, "err", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication failed"})
 		return
 	}
+	subject := result.Subject
 
 	existing, err := h.users.GetByIdentity(providerName, subject)
 	if err == nil && existing != nil {

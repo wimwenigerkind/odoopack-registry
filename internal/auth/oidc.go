@@ -9,12 +9,16 @@ import (
 )
 
 type OIDCConfig struct {
-	Type          string `mapstructure:"type"`
-	AllowLogin    bool   `mapstructure:"allow_login"`
-	AllowRegister bool   `mapstructure:"allow_register"`
-	IssuerURL     string `mapstructure:"issuer_url"`
-	ClientID      string `mapstructure:"client_id"`
-	ClientSecret  string `mapstructure:"client_secret"`
+	Type                string              `mapstructure:"type"`
+	AllowLogin          bool                `mapstructure:"allow_login"`
+	AllowRegister       bool                `mapstructure:"allow_register"`
+	IssuerURL           string              `mapstructure:"issuer_url"`
+	ClientID            string              `mapstructure:"client_id"`
+	ClientSecret        string              `mapstructure:"client_secret"`
+	GroupClaimName      string              `mapstructure:"group_claim_name"`
+	AdminGroup          string              `mapstructure:"admin_group"`
+	GroupTeamMapRemoval bool                `mapstructure:"group_team_map_removal"`
+	GroupTeamMap        map[string][]string `mapstructure:"group_team_map"`
 }
 
 type OidcProvider struct {
@@ -49,6 +53,10 @@ func (p *OidcProvider) AllowLogin() bool          { return p.cfg.AllowLogin }
 func (p *OidcProvider) AllowRegister() bool       { return p.cfg.AllowRegister }
 func (p *OidcProvider) AllowGitIntegration() bool { return false }
 
+func (p *OidcProvider) GroupTeamMap() map[string][]string { return p.cfg.GroupTeamMap }
+func (p *OidcProvider) AdminGroup() string                { return p.cfg.AdminGroup }
+func (p *OidcProvider) GroupTeamMapRemoval() bool         { return p.cfg.GroupTeamMapRemoval }
+
 func (p *OidcProvider) LoginAuthURL(state, nonce, pkceVerifier string) string {
 	return p.oauth2.AuthCodeURL(
 		state,
@@ -57,24 +65,24 @@ func (p *OidcProvider) LoginAuthURL(state, nonce, pkceVerifier string) string {
 	)
 }
 
-func (p *OidcProvider) ExchangeLogin(ctx context.Context, code, pkceVerifier, expectedNonce string) (subject, email string, emailVerified bool, err error) {
+func (p *OidcProvider) ExchangeLogin(ctx context.Context, code, pkceVerifier, expectedNonce string) (LoginResult, error) {
 	token, err := p.oauth2.Exchange(ctx, code, oauth2.VerifierOption(pkceVerifier))
 	if err != nil {
-		return "", "", false, fmt.Errorf("token exchange: %w", err)
+		return LoginResult{}, fmt.Errorf("token exchange: %w", err)
 	}
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok {
-		return "", "", false, fmt.Errorf("no id_token in token response")
+		return LoginResult{}, fmt.Errorf("no id_token in token response")
 	}
 	idToken, err := p.verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		return "", "", false, fmt.Errorf("id_token verify: %w", err)
+		return LoginResult{}, fmt.Errorf("id_token verify: %w", err)
 	}
 	if idToken.Nonce != expectedNonce {
-		return "", "", false, fmt.Errorf("nonce mismatch")
+		return LoginResult{}, fmt.Errorf("nonce mismatch")
 	}
 	if idToken.Subject == "" {
-		return "", "", false, fmt.Errorf("id_token missing subject")
+		return LoginResult{}, fmt.Errorf("id_token missing subject")
 	}
 	var claims struct {
 		Email             string `json:"email"`
@@ -83,7 +91,34 @@ func (p *OidcProvider) ExchangeLogin(ctx context.Context, code, pkceVerifier, ex
 		PreferredUsername string `json:"preferred_username"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
-		return "", "", false, fmt.Errorf("parse claims: %w", err)
+		return LoginResult{}, fmt.Errorf("parse claims: %w", err)
 	}
-	return idToken.Subject, claims.Email, claims.EmailVerified, nil
+
+	claimName := p.cfg.GroupClaimName
+	if claimName == "" {
+		claimName = "groups"
+	}
+	var allClaims map[string]any
+	_ = idToken.Claims(&allClaims)
+
+	return LoginResult{
+		Subject:       idToken.Subject,
+		Email:         claims.Email,
+		EmailVerified: claims.EmailVerified,
+		Groups:        stringSliceClaim(allClaims[claimName]),
+	}, nil
+}
+
+func stringSliceClaim(v any) []string {
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(arr))
+	for _, item := range arr {
+		if s, ok := item.(string); ok && s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }

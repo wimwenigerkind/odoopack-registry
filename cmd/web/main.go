@@ -85,7 +85,7 @@ func main() {
 	downloadHandler := handler.NewDownloadHandler(addonRepo, versionRepo, groupRepo, userRepo, store, mode)
 	triggerHandler := handler.NewTriggerHandler(addonRepo, userRepo, queue)
 	registryHandler := handler.NewRegistryHandler(addonRepo, groupRepo, userRepo, integrationRepo, authRegistry, store, mode, baseURL)
-	authHandler := handler.NewAuthHandler(authRegistry, stateStore, sessionStore, userRepo, integrationRepo, viper.GetBool("auth.cookie_secure"))
+	authHandler := handler.NewAuthHandler(authRegistry, stateStore, sessionStore, userRepo, groupRepo, integrationRepo, viper.GetBool("auth.cookie_secure"))
 	groupHandler := handler.NewGroupHandler(groupRepo)
 	userHandler := handler.NewUserHandler(userRepo)
 	tokenHandler := handler.NewTokenHandler(tokenRepo)

@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type GroupRepository struct {
@@ -64,6 +65,11 @@ func (r *GroupRepository) Delete(id uuid.UUID) error {
 
 func (r *GroupRepository) AddMember(groupID, userID uuid.UUID) error {
 	return r.db.Create(&models.GroupMembership{GroupID: groupID, UserID: userID}).Error
+}
+
+func (r *GroupRepository) EnsureMember(groupID, userID uuid.UUID) error {
+	return r.db.Clauses(clause.OnConflict{DoNothing: true}).
+		Create(&models.GroupMembership{GroupID: groupID, UserID: userID}).Error
 }
 
 func (r *GroupRepository) RemoveMember(groupID, userID uuid.UUID) error {
