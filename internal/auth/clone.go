@@ -10,7 +10,7 @@ import (
 
 type IntegrationStore interface {
 	GetByID(id uuid.UUID) (*models.OAuthIntegration, error)
-	UpdateTokens(it *models.OAuthIntegration) error
+	RefreshTokensWithLock(ctx context.Context, id uuid.UUID, refresh func(*models.OAuthIntegration) (bool, error)) (*models.OAuthIntegration, error)
 }
 
 func ResolveCloneURL(ctx context.Context, registry *Registry, store IntegrationStore, gitURL string, integrationID *uuid.UUID) (string, error) {

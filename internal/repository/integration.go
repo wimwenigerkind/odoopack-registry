@@ -1,11 +1,13 @@
 package repository
 
 import (
+	"context"
 	"errors"
 
 	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type IntegrationRepository struct {
@@ -58,4 +60,35 @@ func (r *IntegrationRepository) UpdateTokens(it *models.OAuthIntegration) error 
 			"refresh_token": it.RefreshToken,
 			"expires_at":    it.ExpiresAt,
 		}).Error
+}
+
+func (r *IntegrationRepository) RefreshTokensWithLock(ctx context.Context, id uuid.UUID, refresh func(*models.OAuthIntegration) (bool, error)) (*models.OAuthIntegration, error) {
+	var it models.OAuthIntegration
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", id).First(&it).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrNotFound
+			}
+			return err
+		}
+		changed, err := refresh(&it)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			return nil
+		}
+		return tx.Model(&models.OAuthIntegration{}).
+			Where("id = ?", it.ID).
+			Updates(map[string]any{
+				"access_token":  it.AccessToken,
+				"refresh_token": it.RefreshToken,
+				"expires_at":    it.ExpiresAt,
+			}).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &it, nil
 }
