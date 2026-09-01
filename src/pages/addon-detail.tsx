@@ -282,7 +282,10 @@ function RequiresSection({ versions }: { versions: AddonVersion[] }) {
   const depends = target?.depends ?? []
   if (depends.length === 0) return null
 
-  const byName = new Map((allAddons ?? []).map((a) => [a.name, a.id]))
+  const toModuleName = (n: string) => n.replace(/[/-]/g, "_")
+  const byName = new Map(
+    (allAddons ?? []).map((a) => [toModuleName(a.name), a.id]),
+  )
 
   return (
     <Card>
