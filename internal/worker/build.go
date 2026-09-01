@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path"
 	"regexp"
 	"strings"
 	"sync"
@@ -221,7 +220,7 @@ func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, cloneUR
 		return fmt.Errorf("mark building: %w", err)
 	}
 
-	rootDir := moduleDir(job.Name, job.Subpath)
+	rootDir := formatAddonDir(job.Name)
 	archive, err := git.CloneAndZip(cloneURL, d.Ref.Name, rootDir, job.Subpath)
 	if err != nil {
 		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
@@ -288,12 +287,6 @@ func normalizeVersion(tag string) (string, bool) {
 	return v, true
 }
 
-func moduleDir(name, subpath string) string {
-	if cleaned := strings.Trim(subpath, "/"); cleaned != "" {
-		return path.Base(cleaned)
-	}
-	if i := strings.LastIndex(name, "/"); i >= 0 {
-		return name[i+1:]
-	}
-	return name
+func formatAddonDir(name string) string {
+	return strings.NewReplacer("/", "_", "-", "_").Replace(name)
 }
