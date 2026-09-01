@@ -191,12 +191,14 @@ function Detail({
 function RepoSettings({ repo }: { repo: Repo }) {
   const update = useUpdateRepo(repo.id)
   const { data: integrations } = useIntegrations()
+  const [gitURL, setGitURL] = useState(repo.git_url)
   const [defaultBranch, setDefaultBranch] = useState(repo.default_branch)
   const [integrationID, setIntegrationID] = useState(repo.integration_id ?? "")
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     update.mutate({
+      git_url: gitURL,
       default_branch: defaultBranch,
       integration_id: integrationID || null,
     })
@@ -206,6 +208,13 @@ function RepoSettings({ repo }: { repo: Repo }) {
     <Card className="p-5">
       <h2 className="mb-4 font-medium">Settings</h2>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Field label="Git URL" htmlFor="git-url">
+          <Input
+            id="git-url"
+            value={gitURL}
+            onChange={(e) => setGitURL(e.target.value)}
+          />
+        </Field>
         <Field label="Default branch" htmlFor="default-branch">
           <Input
             id="default-branch"
@@ -228,6 +237,10 @@ function RepoSettings({ repo }: { repo: Repo }) {
             ))}
           </Select>
         </Field>
+
+        {update.isError && (
+          <p className="text-sm text-danger">{update.error.message}</p>
+        )}
 
         <div className="flex justify-end">
           <Button type="submit" loading={update.isPending}>

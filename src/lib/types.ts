@@ -156,6 +156,7 @@ export interface UpdateAddonRequest {
 }
 
 export interface UpdateRepoRequest {
+  git_url?: string
   default_branch?: string
   integration_id?: string | null
 }

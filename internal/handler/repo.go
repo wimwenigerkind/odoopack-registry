@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
+	"github.com/wimwenigerkind/odoopack-registry/internal/validate"
 )
 
 type RepoHandler struct {
@@ -80,6 +82,7 @@ func (h *RepoHandler) ListMine(c *gin.Context) {
 }
 
 type updateRepoRequest struct {
+	GitURL        *string         `json:"git_url"`
 	DefaultBranch *string         `json:"default_branch"`
 	IntegrationID json.RawMessage `json:"integration_id"`
 }
@@ -113,6 +116,15 @@ func (h *RepoHandler) Update(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	if req.GitURL != nil {
+		gitURL := strings.TrimSpace(*req.GitURL)
+		if err := validate.GitURL(gitURL); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		repo.GitURL = gitURL
 	}
 
 	if req.DefaultBranch != nil {
