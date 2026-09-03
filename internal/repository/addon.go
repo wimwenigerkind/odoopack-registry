@@ -115,6 +115,77 @@ func (r *AddonRepository) ListAllNames() ([]string, error) {
 	return names, err
 }
 
+type AddonSearch struct {
+	Query  string
+	Series string
+	Limit  int
+	Offset int
+}
+
+func (r *AddonRepository) SearchVisible(userID *uuid.UUID, isAdmin bool, s AddonSearch) ([]models.Addon, int64, error) {
+	scope := func(db *gorm.DB) *gorm.DB {
+		db = db.Joins("Repo")
+		switch {
+		case isAdmin:
+		case userID == nil:
+			db = db.Where("addons.visibility = ?", models.VisibilityPublic)
+		default:
+			groupGrant := r.db.
+				Table("group_memberships AS gm").
+				Select("1").
+				Joins("JOIN group_addon_accesses gaa ON gaa.group_id = gm.group_id").
+				Where("gm.user_id = ?", *userID).
+				Where("gaa.addon_id = addons.id")
+
+			db = db.Where(
+				r.db.Where("addons.visibility = ?", models.VisibilityPublic).
+					Or(`"Repo".owner_id = ?`, *userID).
+					Or("EXISTS (?)", groupGrant),
+			)
+		}
+		if s.Query != "" {
+			like := "%" + s.Query + "%"
+			versionMatch := r.db.
+				Table("addon_versions AS av").
+				Select("1").
+				Where("av.addon_id = addons.id").
+				Where("av.summary ILIKE ? OR av.category ILIKE ?", like, like)
+			db = db.Where(
+				r.db.Where("addons.name ILIKE ?", like).
+					Or("EXISTS (?)", versionMatch),
+			)
+		}
+		if s.Series != "" {
+			seriesMatch := r.db.
+				Table("addon_versions AS av").
+				Select("1").
+				Where("av.addon_id = addons.id").
+				Where("av.status = ?", models.StatusReady).
+				Where("av.version LIKE ?", s.Series+".%")
+			db = db.Where("EXISTS (?)", seriesMatch)
+		}
+		return db
+	}
+
+	var total int64
+	if err := scope(r.db.Model(&models.Addon{})).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	q := scope(r.db.
+		Preload("Versions").
+		Preload("Repo").
+		Preload("Repo.Owner")).
+		Order("addons.name")
+	if s.Limit > 0 {
+		q = q.Limit(s.Limit).Offset(s.Offset)
+	}
+
+	var addons []models.Addon
+	err := q.Find(&addons).Error
+	return addons, total, err
+}
+
 func (r *AddonRepository) ListVisibleTo(userID *uuid.UUID, isAdmin bool, nameFilter string) ([]models.Addon, error) {
 	var addons []models.Addon
 	q := r.db.

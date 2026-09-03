@@ -145,6 +145,13 @@ export interface Addon {
   versions?: AddonVersion[]
 }
 
+export interface AddonListResponse {
+  items: Addon[]
+  total: number
+  page: number
+  per_page: number
+}
+
 export interface RegisterAddonRequest {
   name: string
   git_url: string

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -71,8 +72,29 @@ func (h *AddonHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, addon)
 }
 
+type addonListResponse struct {
+	Items   []models.Addon `json:"items"`
+	Total   int64          `json:"total"`
+	Page    int            `json:"page"`
+	PerPage int            `json:"per_page"`
+}
+
 func (h *AddonHandler) List(c *gin.Context) {
-	addons, err := h.addons.ListVisibleTo(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), c.Query("name"))
+	page := atoiDefault(c.Query("page"), 1)
+	if page < 1 {
+		page = 1
+	}
+	perPage := atoiDefault(c.Query("per_page"), 20)
+	if perPage < 1 || perPage > 100 {
+		perPage = 20
+	}
+
+	addons, total, err := h.addons.SearchVisible(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), repository.AddonSearch{
+		Query:  strings.TrimSpace(c.Query("q")),
+		Series: strings.TrimSpace(c.Query("series")),
+		Limit:  perPage,
+		Offset: (page - 1) * perPage,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
@@ -83,7 +105,18 @@ func (h *AddonHandler) List(c *gin.Context) {
 		}
 		annotateVersions(addons[i].Versions)
 	}
-	c.JSON(http.StatusOK, addons)
+	c.JSON(http.StatusOK, addonListResponse{Items: addons, Total: total, Page: page, PerPage: perPage})
+}
+
+func atoiDefault(s string, def int) int {
+	if s == "" {
+		return def
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return def
+	}
+	return n
 }
 
 func (h *AddonHandler) Register(c *gin.Context) {
