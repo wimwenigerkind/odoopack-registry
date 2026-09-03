@@ -248,7 +248,15 @@ func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, cloneUR
 	}
 
 	if archive.Manifest != nil {
-		if err := c.versionRepo.SetManifestMeta(av.ID, archive.Manifest.Depends, archive.Manifest.Version); err != nil {
+		if err := c.versionRepo.SetManifestMeta(av.ID, repository.ManifestMeta{
+			Depends:         archive.Manifest.Depends,
+			ManifestVersion: archive.Manifest.Version,
+			Summary:         archive.Manifest.Summary,
+			License:         archive.Manifest.License,
+			Category:        archive.Manifest.Category,
+			Author:          archive.Manifest.Author,
+			Website:         archive.Manifest.Website,
+		}); err != nil {
 			slog.Warn("store manifest meta", "addon", job.Name, "version", d.Version, "err", err)
 		}
 	}

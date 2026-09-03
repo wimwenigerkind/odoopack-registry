@@ -53,6 +53,11 @@ type AddonVersion struct {
 	BuiltAt         *time.Time    `json:"built_at,omitempty"`
 	Depends         []string      `gorm:"serializer:json" json:"depends,omitempty"`
 	ManifestVersion string        `json:"manifest_version,omitempty"`
+	Summary         string        `json:"summary,omitempty"`
+	License         string        `json:"license,omitempty"`
+	Category        string        `json:"category,omitempty"`
+	Author          string        `json:"author,omitempty"`
+	Website         string        `json:"website,omitempty"`
 	Series          string        `gorm:"-" json:"series,omitempty"`
 	IsLatest        bool          `gorm:"-" json:"is_latest"`
 	DependsResolved []ResolvedDep `gorm:"-" json:"depends_resolved,omitempty"`

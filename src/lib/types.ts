@@ -99,6 +99,11 @@ export interface AddonVersion {
   depends?: string[]
   depends_resolved?: ResolvedDep[]
   manifest_version?: string
+  summary?: string
+  license?: string
+  category?: string
+  author?: string
+  website?: string
   series?: string
   is_latest: boolean
 }

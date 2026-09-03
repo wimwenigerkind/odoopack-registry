@@ -105,10 +105,28 @@ func (r *AddonVersionRepository) GetReadme(versionID uuid.UUID) (*models.AddonVe
 	return &readme, nil
 }
 
-func (r *AddonVersionRepository) SetManifestMeta(id uuid.UUID, depends []string, manifestVersion string) error {
+type ManifestMeta struct {
+	Depends         []string
+	ManifestVersion string
+	Summary         string
+	License         string
+	Category        string
+	Author          string
+	Website         string
+}
+
+func (r *AddonVersionRepository) SetManifestMeta(id uuid.UUID, meta ManifestMeta) error {
 	return r.db.Model(&models.AddonVersion{}).Where("id = ?", id).
-		Select("depends", "manifest_version").
-		Updates(models.AddonVersion{Depends: depends, ManifestVersion: manifestVersion}).Error
+		Select("depends", "manifest_version", "summary", "license", "category", "author", "website").
+		Updates(models.AddonVersion{
+			Depends:         meta.Depends,
+			ManifestVersion: meta.ManifestVersion,
+			Summary:         meta.Summary,
+			License:         meta.License,
+			Category:        meta.Category,
+			Author:          meta.Author,
+			Website:         meta.Website,
+		}).Error
 }
 
 func (r *AddonVersionRepository) SetReady(id uuid.UUID, storageKey, contentHash string, sizeBytes int64) error {

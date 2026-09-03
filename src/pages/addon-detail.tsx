@@ -55,6 +55,10 @@ export default function AddonDetailPage() {
   const isOwner = user?.id === addon.repo?.owner_id
   const versions = addon.versions ?? []
   const integration = addon.repo?.integration
+  const latest =
+    versions.find((v) => v.is_latest) ??
+    versions.find((v) => v.status === "ready") ??
+    versions[0]
 
   return (
     <div className="flex flex-col gap-6">
@@ -76,6 +80,9 @@ export default function AddonDetailPage() {
               {addon.visibility}
             </Badge>
           </div>
+          {latest?.summary && (
+            <p className="max-w-2xl text-sm text-muted">{latest.summary}</p>
+          )}
           <div className="flex items-center gap-2 text-sm text-muted">
             <Avatar hash={addon.repo?.owner?.gravatar_hash} size={20} />
             {addon.repo?.owner?.username ?? "-"}
@@ -142,6 +149,27 @@ export default function AddonDetailPage() {
               <span className="text-muted">none (anonymous clone)</span>
             )}
           </Detail>
+          {latest?.license && (
+            <Detail label="License">
+              <code>{latest.license}</code>
+            </Detail>
+          )}
+          {latest?.category && (
+            <Detail label="Category">{latest.category}</Detail>
+          )}
+          {latest?.author && <Detail label="Author">{latest.author}</Detail>}
+          {latest?.website && (
+            <Detail label="Website">
+              <a
+                href={latest.website}
+                target="_blank"
+                rel="noreferrer"
+                className="break-all text-accent"
+              >
+                {latest.website}
+              </a>
+            </Detail>
+          )}
         </dl>
       </Card>
 
