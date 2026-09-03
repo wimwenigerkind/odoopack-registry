@@ -17,6 +17,7 @@ import {
   EmptyState,
   Field,
   Input,
+  SecretValue,
   Spinner,
   Table,
   TBody,
@@ -310,10 +311,7 @@ function TokensCard() {
                 <TR key={t.id}>
                   <TD className="font-medium">{t.name}</TD>
                   <TD>
-                    <div className="flex items-center gap-1">
-                      <code className="text-xs">{t.token}</code>
-                      <CopyButton value={t.token} />
-                    </div>
+                    <SecretValue value={t.token} />
                   </TD>
                   <TD className="text-muted">
                     {new Date(t.created_at).toLocaleDateString()}
@@ -485,12 +483,7 @@ function IntegrationPanel({
           </div>
         </Field>
         <Field label="Webhook secret">
-          <div className="flex items-center gap-1">
-            <code className="flex-1 truncate rounded-md bg-fg/5 px-2 py-1 text-xs">
-              {i.hook_secret || "-"}
-            </code>
-            <CopyButton value={i.hook_secret ?? ""} />
-          </div>
+          <SecretValue value={i.hook_secret ?? ""} />
         </Field>
       </div>
 
