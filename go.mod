@@ -13,7 +13,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/wimwenigerkind/odoo-manifest v0.0.0-20260901165831-fc817747335b
 	github.com/wimwenigerkind/odoopack-semver v0.0.0-20260827211541-1f15691b59d7
-	github.com/yuin/goldmark v1.8.5
+	github.com/yuin/goldmark v1.8.6
 	golang.org/x/oauth2 v0.37.0
 	gorm.io/driver/postgres v1.6.2
 	gorm.io/gorm v1.31.2
