@@ -145,11 +145,14 @@ export interface Addon {
   versions?: AddonVersion[]
 }
 
-export interface AddonListResponse {
-  items: Addon[]
-  total: number
-  page: number
-  per_page: number
+export interface AddonPage {
+  data: Addon[]
+  meta: {
+    next_cursor?: string
+    prev_cursor?: string
+    has_more: boolean
+    limit: number
+  }
 }
 
 export interface RegisterAddonRequest {

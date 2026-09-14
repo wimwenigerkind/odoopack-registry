@@ -21,19 +21,20 @@ export default function HomePage() {
 
   const q = params.get("q")?.trim() ?? ""
   const series = params.get("series") ?? ""
-  const page = Math.max(1, Number(params.get("page") ?? "1") || 1)
 
-  const { data, isLoading } = useAddons({ q, series, page })
-  const addons = data?.items ?? []
-  const total = data?.total ?? 0
-  const perPage = data?.per_page ?? 20
-  const totalPages = Math.max(1, Math.ceil(total / perPage))
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useAddons({ q, series })
+  const addons = data?.pages.flatMap((p) => p.data) ?? []
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
     else next.delete(key)
-    if (key !== "page") next.delete("page")
     setParams(next)
   }
 
@@ -65,10 +66,6 @@ export default function HomePage() {
             </option>
           ))}
         </Select>
-        <span className="text-sm text-muted">
-          {total} addon{total === 1 ? "" : "s"}
-          {q ? ` matching "${q}"` : ""}
-        </span>
       </div>
 
       {isLoading ? (
@@ -94,35 +91,24 @@ export default function HomePage() {
           }
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {addons.map((addon) => (
-            <AddonCard key={addon.id} addon={addon} />
-          ))}
-        </div>
-      )}
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setParam("page", String(page - 1))}
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-muted">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setParam("page", String(page + 1))}
-          >
-            Next
-          </Button>
-        </div>
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {addons.map((addon) => (
+              <AddonCard key={addon.id} addon={addon} />
+            ))}
+          </div>
+          {hasNextPage && (
+            <div className="flex justify-center">
+              <Button
+                variant="secondary"
+                loading={isFetchingNextPage}
+                onClick={() => fetchNextPage()}
+              >
+                Load more
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

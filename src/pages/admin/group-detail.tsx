@@ -18,7 +18,7 @@ import {
   THead,
   TR,
 } from "@/components/ui"
-import { useAddons } from "@/hooks/addons/use-addons"
+import { useAddonOptions } from "@/hooks/addons/use-addons"
 import {
   useGrantGroupAddon,
   useGroupAddons,
@@ -41,8 +41,8 @@ export default function AdminGroupDetailPage() {
   const { data: members } = useGroupMembers(id)
   const { data: addonAccess } = useGroupAddons(id)
   const { data: users } = useUsers()
-  const { data: addonsResponse } = useAddons({ per_page: 100 })
-  const addons = addonsResponse?.items
+  const { data: addonsResponse } = useAddonOptions()
+  const addons = addonsResponse?.data
   const addMember = useAddGroupMember(id)
   const removeMember = useRemoveGroupMember(id)
   const grantAddon = useGrantGroupAddon(id)

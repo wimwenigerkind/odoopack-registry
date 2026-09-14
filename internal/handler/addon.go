@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +15,8 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
 	"github.com/wimwenigerkind/odoopack-registry/internal/validate"
+	paginate "github.com/wimwenigerkind/paginate"
+	ginx "github.com/wimwenigerkind/paginate/ginx"
 )
 
 type AddonHandler struct {
@@ -72,51 +73,49 @@ func (h *AddonHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, addon)
 }
 
-type addonListResponse struct {
-	Items   []models.Addon `json:"items"`
-	Total   int64          `json:"total"`
-	Page    int            `json:"page"`
-	PerPage int            `json:"per_page"`
+var addonPaginator = mustAddonPaginator()
+
+func mustAddonPaginator() *paginate.Paginator {
+	allowlist, err := paginate.NewAllowlist(paginate.AllowlistConfig{
+		Fields: map[string][]paginate.Column{
+			"name": {{Table: "addons", Name: "name"}},
+		},
+		Default:  "name",
+		Tiebreak: paginate.Column{Table: "addons", Name: "id"},
+	})
+	if err != nil {
+		panic(err)
+	}
+	p, err := paginate.New(paginate.Config{Allowlist: allowlist, DefaultLimit: 20, MaxLimit: 100})
+	if err != nil {
+		panic(err)
+	}
+	return p
 }
 
 func (h *AddonHandler) List(c *gin.Context) {
-	page := atoiDefault(c.Query("page"), 1)
-	if page < 1 {
-		page = 1
-	}
-	perPage := atoiDefault(c.Query("per_page"), 20)
-	if perPage < 1 || perPage > 100 {
-		perPage = 20
-	}
-
-	addons, total, err := h.addons.SearchVisible(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), repository.AddonSearch{
+	q := h.addons.VisibleQuery(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), repository.AddonSearch{
 		Query:  strings.TrimSpace(c.Query("q")),
 		Series: strings.TrimSpace(c.Query("series")),
-		Limit:  perPage,
-		Offset: (page - 1) * perPage,
-	})
+	}).
+		Preload("Versions").
+		Preload("Repo").
+		Preload("Repo.Owner")
+
+	page, err := paginate.Keyset[models.Addon](q, addonPaginator, ginx.Bind(c))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		if !ginx.Abort(c, err) {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		}
 		return
 	}
-	for i := range addons {
-		if addons[i].Repo != nil {
-			sanitizeOwner(addons[i].Repo.Owner)
+	for i := range page.Data {
+		if page.Data[i].Repo != nil {
+			sanitizeOwner(page.Data[i].Repo.Owner)
 		}
-		annotateVersions(addons[i].Versions)
+		annotateVersions(page.Data[i].Versions)
 	}
-	c.JSON(http.StatusOK, addonListResponse{Items: addons, Total: total, Page: page, PerPage: perPage})
-}
-
-func atoiDefault(s string, def int) int {
-	if s == "" {
-		return def
-	}
-	n, err := strconv.Atoi(s)
-	if err != nil {
-		return def
-	}
-	return n
+	c.JSON(http.StatusOK, page)
 }
 
 func (h *AddonHandler) Register(c *gin.Context) {
