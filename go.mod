@@ -15,7 +15,7 @@ require (
 	github.com/wimwenigerkind/odoopack-semver v0.0.0-20260827211541-1f15691b59d7
 	github.com/yuin/goldmark v1.8.5
 	golang.org/x/oauth2 v0.36.0
-	gorm.io/driver/postgres v1.6.2
+	gorm.io/driver/postgres v1.6.3
 	gorm.io/gorm v1.31.2
 )
 
@@ -68,6 +68,7 @@ require (
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
+	github.com/wimwenigerkind/paginate v0.0.0-20260914172329-2af10e332e58 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
