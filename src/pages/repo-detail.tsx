@@ -1,8 +1,7 @@
 import { Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
-import type { FormEvent, ReactNode } from "react"
+import type { FormEvent } from "react"
 import { Link, useNavigate, useParams } from "react-router"
-import { Avatar } from "@/components/avatar"
 import { PageHeader } from "@/components/page-header"
 import {
   Badge,
@@ -53,32 +52,20 @@ export default function RepoDetailPage() {
         ]}
       />
 
-      <Card className="p-5">
-        <dl className="grid grid-cols-1 gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
-          <Detail label="Default branch">
-            <code>{repo.default_branch}</code>
-          </Detail>
-          <Detail label="Owner">
-            <span className="flex items-center gap-2">
-              <Avatar hash={repo.owner?.gravatar_hash} size={20} />
-              {repo.owner?.username ?? "-"}
-            </span>
-          </Detail>
-          {isOwner && (
-            <Detail label="Integration">
-              {repo.integration ? (
-                <span>
-                  {repo.integration.provider}
-                  {repo.integration.account_name
-                    ? ` (${repo.integration.account_name})`
-                    : ""}
-                </span>
-              ) : (
-                <span className="text-muted-foreground">none (anonymous clone)</span>
-              )}
-            </Detail>
-          )}
-        </dl>
+      <Card className="divide-y divide-border sm:flex sm:divide-x sm:divide-y-0">
+        <MetaCell label="Default branch" value={repo.default_branch} />
+        <MetaCell label="Owner" value={repo.owner?.username ?? "-"} />
+        {isOwner && (
+          <MetaCell
+            label="Integration"
+            value={
+              repo.integration
+                ? `${repo.integration.provider}${repo.integration.account_name ? ` (${repo.integration.account_name})` : ""}`
+                : "none (anonymous clone)"
+            }
+          />
+        )}
+        <MetaCell label="Addons" value={String(addons.length)} />
       </Card>
 
       {isOwner && <RepoSettings key={repo.id} repo={repo} />}
@@ -166,19 +153,15 @@ function RepoSkeleton() {
   )
 }
 
-function Detail({
-  label,
-  children,
-}: {
-  label: string
-  children: ReactNode
-}) {
+function MetaCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1">
-      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="min-w-0 flex-1 p-4">
+      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
-      </dt>
-      <dd>{children}</dd>
+      </div>
+      <div className="mt-1 truncate font-medium" title={value}>
+        {value}
+      </div>
     </div>
   )
 }
