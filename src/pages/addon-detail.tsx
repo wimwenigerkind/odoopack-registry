@@ -59,6 +59,14 @@ export default function AddonDetailPage() {
     versions.find((v) => v.is_latest) ??
     versions.find((v) => v.status === "ready") ??
     versions[0]
+  const seriesList = Array.from(
+    new Set(
+      versions
+        .filter((v) => v.status === "ready")
+        .map((v) => v.series)
+        .filter((s): s is string => Boolean(s)),
+    ),
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -105,6 +113,16 @@ export default function AddonDetailPage() {
         <Avatar hash={addon.repo?.owner?.gravatar_hash} size={20} />
         {addon.repo?.owner?.username ?? "-"}
       </div>
+
+      <Card className="divide-y divide-border sm:flex sm:divide-x sm:divide-y-0">
+        <MetaCell label="Latest version" value={latest?.version ?? "-"} />
+        <MetaCell
+          label="Series"
+          value={seriesList.length ? seriesList.join(", ") : "-"}
+        />
+        <MetaCell label="License" value={latest?.license ?? "-"} />
+        <MetaCell label="Versions" value={String(versions.length)} />
+      </Card>
 
       <InstallSnippet name={addon.name} />
 
@@ -343,6 +361,19 @@ function RequiresSection({ versions }: { versions: AddonVersion[] }) {
         ))}
       </ul>
     </Card>
+  )
+}
+
+function MetaCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 flex-1 p-4">
+      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1 truncate font-medium" title={value}>
+        {value}
+      </div>
+    </div>
   )
 }
 
