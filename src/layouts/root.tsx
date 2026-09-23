@@ -6,15 +6,15 @@ import { SidebarInset, SidebarProvider, TooltipProvider } from "@/components/ui"
 export default function RootLayout() {
   return (
     <TooltipProvider delayDuration={0}>
-      <SidebarProvider>
+      <SidebarProvider className="h-svh overflow-hidden">
         <AppSidebar />
-        <SidebarInset>
+        <SidebarInset className="min-h-0 overflow-hidden">
           <AppHeader />
-          <main className="flex-1 px-4 py-8 sm:px-6 lg:px-8">
-            <div className="mx-auto w-full max-w-[1100px]">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto w-full max-w-[1100px] px-4 py-8 sm:px-6 lg:px-8">
               <Outlet />
             </div>
-          </main>
+          </div>
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>
