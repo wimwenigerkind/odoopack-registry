@@ -1,4 +1,12 @@
-import { Plus, Trash2 } from "lucide-react"
+import {
+  FolderGit2,
+  KeyRound,
+  Link2,
+  Plug,
+  Plus,
+  Trash2,
+} from "lucide-react"
+import type { ComponentType } from "react"
 import { useState } from "react"
 import type { FormEvent } from "react"
 import { Link } from "react-router"
@@ -49,6 +57,9 @@ type Identity = { id: string; provider: string; created_at: string }
 
 export default function ProfilePage() {
   const { data: user, isLoading, isError } = useMe()
+  const { data: repos } = useMyRepos()
+  const { data: tokens } = useTokens()
+  const { data: integrations } = useIntegrations()
 
   if (isLoading)
     return (
@@ -59,34 +70,81 @@ export default function ProfilePage() {
   if (isError) return <p className="text-destructive">Could not load profile.</p>
   if (!user) return <p>You must be logged in.</p>
 
+  const identities = user.identities ?? []
+  const stats: StatItem[] = [
+    { label: "Repositories", value: repos?.length ?? 0, icon: FolderGit2 },
+    { label: "API tokens", value: tokens?.length ?? 0, icon: KeyRound },
+    { label: "Integrations", value: integrations?.length ?? 0, icon: Plug },
+    { label: "Accounts", value: identities.length, icon: Link2 },
+  ]
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
-        <Avatar hash={user.gravatar_hash} size={64} />
-        <div className="min-w-0">
-          <h1 className="truncate text-2xl font-semibold">
-            {user.username || user.email}
-          </h1>
-          <p className="text-sm text-muted-foreground">{user.email}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Member since {new Date(user.created_at).toLocaleDateString()}
-            {" · "}
-            <code>{user.id}</code>
-          </p>
+      <Card className="overflow-hidden p-0">
+        <div className="h-24 bg-gradient-to-r from-primary/25 via-primary/10 to-transparent" />
+        <div className="-mt-10 flex flex-wrap items-end gap-4 px-6 pb-6">
+          <div className="overflow-hidden rounded-2xl bg-card ring-4 ring-card">
+            <Avatar hash={user.gravatar_hash} size={80} />
+          </div>
+          <div className="min-w-0 flex-1 pb-1">
+            <h1 className="truncate text-2xl font-semibold tracking-tight">
+              {user.username || user.email}
+            </h1>
+            <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pb-1">
+            {user.is_admin && <Badge variant="accent">admin</Badge>}
+            <Badge variant="neutral">
+              Since {new Date(user.created_at).toLocaleDateString()}
+            </Badge>
+            <span className="inline-flex items-center gap-1 rounded-md bg-foreground/5 px-2 py-1 font-mono text-xs text-muted-foreground">
+              {user.id.slice(0, 8)}
+              <CopyButton value={user.id} />
+            </span>
+          </div>
         </div>
+      </Card>
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {stats.map((s) => (
+          <StatCard key={s.label} {...s} />
+        ))}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
           <MyReposCard />
           <TokensCard />
-          <IntegrationsCard />
         </div>
         <div className="flex flex-col gap-6">
-          <AccountsCard identities={user.identities ?? []} />
+          <AccountsCard identities={identities} />
         </div>
       </div>
+
+      <IntegrationsCard />
     </div>
+  )
+}
+
+type StatItem = {
+  label: string
+  value: number
+  icon: ComponentType<{ className?: string }>
+}
+
+function StatCard({ label, value, icon: Icon }: StatItem) {
+  return (
+    <Card className="flex items-center gap-3 p-4">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Icon className="size-5" />
+      </span>
+      <div className="min-w-0">
+        <div className="text-2xl font-semibold leading-none tabular-nums">
+          {value}
+        </div>
+        <div className="mt-1 truncate text-xs text-muted-foreground">{label}</div>
+      </div>
+    </Card>
   )
 }
 
@@ -100,7 +158,10 @@ function AccountsCard({ identities }: { identities: Identity[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Connected accounts</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Link2 className="size-4 text-muted-foreground" />
+          Connected accounts
+        </CardTitle>
         <CardDescription>
           Sign-in providers linked to your account.
         </CardDescription>
@@ -173,7 +234,10 @@ function MyReposCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>My repositories</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <FolderGit2 className="size-4 text-muted-foreground" />
+          My repositories
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -255,7 +319,10 @@ function TokensCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>API tokens</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <KeyRound className="size-4 text-muted-foreground" />
+          API tokens
+        </CardTitle>
         <CardDescription>
           Used by the CLI to access this registry. Send as{" "}
           <code>Authorization: Bearer &lt;token&gt;</code>.
@@ -364,7 +431,10 @@ function IntegrationsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Git integrations</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Plug className="size-4 text-muted-foreground" />
+          Git integrations
+        </CardTitle>
         <CardDescription>
           Connect a git provider so the registry can clone your private repos
           when syncing addons.
