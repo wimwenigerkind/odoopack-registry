@@ -60,7 +60,7 @@ export default function HomePage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Select
           value={series}
           onChange={(e) => setParam("series", e.target.value)}
@@ -73,6 +73,12 @@ export default function HomePage() {
             </option>
           ))}
         </Select>
+        {!isLoading && addons.length > 0 && (
+          <span className="text-sm text-muted-foreground">
+            {addons.length}
+            {hasNextPage ? "+" : ""} addon{addons.length === 1 ? "" : "s"}
+          </span>
+        )}
       </div>
 
       {isLoading ? (
@@ -99,7 +105,7 @@ export default function HomePage() {
         />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {addons.map((addon) => (
               <AddonCard key={addon.id} addon={addon} />
             ))}
@@ -122,24 +128,57 @@ export default function HomePage() {
 }
 
 function AddonCard({ addon }: { addon: Addon }) {
-  const versions = addon.versions?.length ?? 0
+  const versions = addon.versions ?? []
+  const count = versions.length
+  const ready = versions.filter((v) => v.status === "ready")
+  const latest = versions.find((v) => v.is_latest) ?? ready[0] ?? versions[0]
+  const seriesList = Array.from(
+    new Set(ready.map((v) => v.series).filter((s): s is string => Boolean(s))),
+  ).slice(0, 4)
+
   return (
     <Link to={`/addons/${addon.id}`} className="group block h-full">
-      <Card className="flex h-full flex-col gap-4 p-5 transition-colors hover:border-primary/50">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <Package className="size-4 shrink-0 text-muted-foreground" />
-            <span className="truncate font-medium group-hover:text-primary">
-              {addon.name}
+      <Card className="flex h-full flex-col gap-4 p-5 transition-all hover:border-primary/50 hover:shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Package className="size-5" />
             </span>
+            <div className="min-w-0">
+              <div className="truncate font-medium group-hover:text-primary">
+                {addon.name}
+              </div>
+              {latest?.version && (
+                <div className="truncate text-xs text-muted-foreground">
+                  v{latest.version}
+                </div>
+              )}
+            </div>
           </div>
           <Badge variant={addon.visibility === "public" ? "neutral" : "warning"}>
             {addon.visibility}
           </Badge>
         </div>
-        <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground">
+
+        {latest?.summary && (
+          <p className="line-clamp-2 text-sm text-muted-foreground">
+            {latest.summary}
+          </p>
+        )}
+
+        {seriesList.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {seriesList.map((s) => (
+              <Badge key={s} variant="accent">
+                {s}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-auto flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
           <span>
-            {versions} version{versions === 1 ? "" : "s"}
+            {count} version{count === 1 ? "" : "s"}
           </span>
           <span>Updated {new Date(addon.updated_at).toLocaleDateString()}</span>
         </div>
@@ -150,9 +189,9 @@ function AddonCard({ addon }: { addon: Addon }) {
 
 function LoadingGrid() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <Skeleton key={i} className="h-28 rounded-xl" />
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+      {Array.from({ length: 10 }).map((_, i) => (
+        <Skeleton key={i} className="h-44 rounded-xl" />
       ))}
     </div>
   )
