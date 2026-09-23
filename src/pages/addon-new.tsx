@@ -1,7 +1,8 @@
-import { ArrowLeft, CheckCircle2 } from "lucide-react"
+import { CheckCircle2 } from "lucide-react"
 import { useState } from "react"
 import type { FormEvent } from "react"
 import { Link, useSearchParams } from "react-router"
+import { PageHeader } from "@/components/page-header"
 import {
   Button,
   buttonVariants,
@@ -124,14 +125,11 @@ function NewAddonForm({
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        to="/"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        Back
-      </Link>
-      <h1 className="text-2xl font-semibold">Register addon</h1>
+      <PageHeader
+        title="Register addon"
+        description="Publish an Odoo module from a git repository."
+        breadcrumbs={[{ label: "Addons", to: "/" }, { label: "Register" }]}
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <form
@@ -147,7 +145,7 @@ function NewAddonForm({
                 <input
                   type="radio"
                   name="repo-mode"
-                  className="accent-accent"
+                  className="accent-primary"
                   checked={repoMode === "existing"}
                   onChange={() => setRepoMode("existing")}
                 />
@@ -157,7 +155,7 @@ function NewAddonForm({
                 <input
                   type="radio"
                   name="repo-mode"
-                  className="accent-accent"
+                  className="accent-primary"
                   checked={repoMode === "new"}
                   onChange={() => setRepoMode("new")}
                 />

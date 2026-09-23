@@ -9,6 +9,7 @@ import {
   Select,
   Skeleton,
 } from "@/components/ui"
+import { PageHeader } from "@/components/page-header"
 import { useAddons } from "@/hooks/addons/use-addons"
 import { useMe } from "@/hooks/auth/use-me"
 import type { Addon } from "@/lib/types"
@@ -40,18 +41,19 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Addons</h1>
-          <p className="text-sm text-muted-foreground">Browse and install Odoo addons.</p>
-        </div>
-        {user && (
-          <Link to="/addons/new" className={buttonVariants()}>
-            <Plus className="size-4" />
-            Register addon
-          </Link>
-        )}
-      </div>
+      <PageHeader
+        title="Addons"
+        description="Browse and install Odoo addons."
+        breadcrumbs={[{ label: "Addons" }]}
+        actions={
+          user ? (
+            <Link to="/addons/new" className={buttonVariants()}>
+              <Plus className="size-4" />
+              Register addon
+            </Link>
+          ) : undefined
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <Select

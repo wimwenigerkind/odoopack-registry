@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Boxes,
   Download,
   FileText,
@@ -12,6 +11,7 @@ import { useMemo, useState } from "react"
 import type { ReactNode } from "react"
 import { Link, useNavigate, useParams } from "react-router"
 import { Avatar } from "@/components/avatar"
+import { PageHeader } from "@/components/page-header"
 import {
   Badge,
   Button,
@@ -62,51 +62,48 @@ export default function AddonDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        to="/"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        Back
-      </Link>
-
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold">{addon.name}</h1>
+      <PageHeader
+        breadcrumbs={[
+          { label: "Addons", to: "/" },
+          { label: addon.name },
+        ]}
+        title={
+          <span className="flex items-center gap-3">
+            {addon.name}
             <Badge
               variant={addon.visibility === "public" ? "neutral" : "warning"}
             >
               {addon.visibility}
             </Badge>
-          </div>
-          {latest?.summary && (
-            <p className="max-w-2xl text-sm text-muted-foreground">{latest.summary}</p>
-          )}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Avatar hash={addon.repo?.owner?.gravatar_hash} size={20} />
-            {addon.repo?.owner?.username ?? "-"}
-          </div>
-        </div>
-        {isOwner && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              loading={sync.isPending}
-              onClick={() => sync.mutate()}
-            >
-              {!sync.isPending && <RefreshCw className="size-4" />}
-              Sync
-            </Button>
-            <Link
-              to={`/addons/${addon.id}/edit`}
-              className={buttonVariants({ variant: "secondary" })}
-            >
-              <Pencil className="size-4" />
-              Edit
-            </Link>
-          </div>
-        )}
+          </span>
+        }
+        description={latest?.summary || undefined}
+        actions={
+          isOwner ? (
+            <>
+              <Button
+                variant="secondary"
+                loading={sync.isPending}
+                onClick={() => sync.mutate()}
+              >
+                {!sync.isPending && <RefreshCw className="size-4" />}
+                Sync
+              </Button>
+              <Link
+                to={`/addons/${addon.id}/edit`}
+                className={buttonVariants({ variant: "secondary" })}
+              >
+                <Pencil className="size-4" />
+                Edit
+              </Link>
+            </>
+          ) : undefined
+        }
+      />
+
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Avatar hash={addon.repo?.owner?.gravatar_hash} size={20} />
+        {addon.repo?.owner?.username ?? "-"}
       </div>
 
       <InstallSnippet name={addon.name} />

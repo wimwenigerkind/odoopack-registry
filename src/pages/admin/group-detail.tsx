@@ -1,7 +1,7 @@
-import { ArrowLeft } from "lucide-react"
 import { useMemo, useState } from "react"
 import type { FormEvent } from "react"
 import { Link, useParams } from "react-router"
+import { PageHeader } from "@/components/page-header"
 import {
   Badge,
   Button,
@@ -94,15 +94,14 @@ export default function AdminGroupDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        to="/admin/groups"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        Back to groups
-      </Link>
-
-      <h1 className="text-2xl font-semibold">{group.name}</h1>
+      <PageHeader
+        title={group.name}
+        breadcrumbs={[
+          { label: "Administration" },
+          { label: "Groups", to: "/admin/groups" },
+          { label: group.name },
+        ]}
+      />
 
       <Card>
         <CardHeader>

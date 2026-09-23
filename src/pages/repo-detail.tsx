@@ -1,8 +1,9 @@
-import { ArrowLeft, Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import type { FormEvent, ReactNode } from "react"
 import { Link, useNavigate, useParams } from "react-router"
 import { Avatar } from "@/components/avatar"
+import { PageHeader } from "@/components/page-header"
 import {
   Badge,
   Button,
@@ -43,20 +44,14 @@ export default function RepoDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        to="/"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        Back
-      </Link>
-
-      <div>
-        <h1 className="text-2xl font-semibold">Repository</h1>
-        <code className="mt-1 block break-all text-sm text-muted-foreground">
-          {repo.git_url}
-        </code>
-      </div>
+      <PageHeader
+        title="Repository"
+        description={<code className="break-all">{repo.git_url}</code>}
+        breadcrumbs={[
+          { label: "Profile", to: "/profile" },
+          { label: "Repository" },
+        ]}
+      />
 
       <Card className="p-5">
         <dl className="grid grid-cols-1 gap-x-8 gap-y-4 text-sm sm:grid-cols-2">

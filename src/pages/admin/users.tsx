@@ -1,4 +1,4 @@
-import { AdminNav } from "@/components/admin-nav"
+import { PageHeader } from "@/components/page-header"
 import {
   Badge,
   Spinner,
@@ -16,8 +16,11 @@ export default function AdminUsersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Admin</h1>
-      <AdminNav />
+      <PageHeader
+        title="Users"
+        description="Manage registered users and their roles."
+        breadcrumbs={[{ label: "Administration" }, { label: "Users" }]}
+      />
 
       {isLoading ? (
         <div className="flex justify-center py-8">

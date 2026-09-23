@@ -1,4 +1,4 @@
-import { LogOut, Package, Search, User, Users } from "lucide-react"
+import { LogOut, Search, User, Users } from "lucide-react"
 import { useState } from "react"
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router"
 import { Avatar } from "@/components/avatar"
@@ -12,6 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Input,
+  Separator,
+  SidebarTrigger,
   Spinner,
 } from "@/components/ui"
 import { useMe } from "@/hooks/auth/use-me"
@@ -23,7 +25,7 @@ function SearchBar() {
   const [value, setValue] = useState(params.get("q") ?? "")
   return (
     <form
-      className="relative min-w-0 flex-1"
+      className="relative w-full max-w-md"
       onSubmit={(e) => {
         e.preventDefault()
         navigate(value ? `/?q=${encodeURIComponent(value)}` : "/")
@@ -99,19 +101,14 @@ function SignInButton() {
   )
 }
 
-export function TopBar() {
+export function AppHeader() {
   const { data: user, isLoading } = useMe()
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-[1100px] items-center gap-3 px-4">
-        <Link
-          to="/"
-          className="flex shrink-0 items-center gap-2 font-semibold"
-        >
-          <Package className="size-5 text-primary" />
-          <span className="hidden sm:inline">Odoopack</span>
-        </Link>
-        <SearchBar />
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur">
+      <SidebarTrigger className="-ml-1" />
+      <Separator orientation="vertical" className="mr-1 h-6" />
+      <SearchBar />
+      <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
         {isLoading ? <Spinner /> : user ? <UserMenu /> : <SignInButton />}
       </div>

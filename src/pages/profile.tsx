@@ -1,4 +1,4 @@
-import { ArrowLeft, Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import type { FormEvent } from "react"
 import { Link } from "react-router"
@@ -61,14 +61,6 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        to="/"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        Back
-      </Link>
-
       <div className="flex items-center gap-4">
         <Avatar hash={user.gravatar_hash} size={64} />
         <div className="min-w-0">

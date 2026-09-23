@@ -1,7 +1,8 @@
-import { ArrowLeft, ArrowRight, FolderGit2 } from "lucide-react"
+import { ArrowRight, FolderGit2 } from "lucide-react"
 import { useState } from "react"
 import type { FormEvent } from "react"
 import { Link, useNavigate, useParams } from "react-router"
+import { PageHeader } from "@/components/page-header"
 import {
   Button,
   buttonVariants,
@@ -48,20 +49,15 @@ function EditForm({ addon }: { addon: Addon }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        to={`/addons/${addon.id}`}
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        Back to addon
-      </Link>
-
-      <div>
-        <h1 className="text-2xl font-semibold">Edit {addon.name}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage addon-level settings. Repository settings live on the repo.
-        </p>
-      </div>
+      <PageHeader
+        title={`Edit ${addon.name}`}
+        description="Manage addon-level settings. Repository settings live on the repo."
+        breadcrumbs={[
+          { label: "Addons", to: "/" },
+          { label: addon.name, to: `/addons/${addon.id}` },
+          { label: "Edit" },
+        ]}
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-5 lg:col-span-2">

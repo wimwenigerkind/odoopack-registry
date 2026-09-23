@@ -2,7 +2,7 @@ import { Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import type { FormEvent } from "react"
 import { Link } from "react-router"
-import { AdminNav } from "@/components/admin-nav"
+import { PageHeader } from "@/components/page-header"
 import {
   Button,
   Card,
@@ -38,8 +38,11 @@ export default function AdminGroupsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Admin</h1>
-      <AdminNav />
+      <PageHeader
+        title="Groups"
+        description="Organize users and grant addon access per group."
+        breadcrumbs={[{ label: "Administration" }, { label: "Groups" }]}
+      />
 
       <Card className="p-5">
         <form onSubmit={handleCreate} className="flex items-end gap-2">
