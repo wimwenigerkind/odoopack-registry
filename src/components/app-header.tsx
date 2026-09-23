@@ -12,7 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Input,
-  Separator,
   SidebarTrigger,
   Spinner,
 } from "@/components/ui"
@@ -106,7 +105,7 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur">
       <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mr-1 h-6" />
+      <div aria-hidden className="mr-1 h-6 w-px shrink-0 bg-border" />
       <SearchBar />
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
