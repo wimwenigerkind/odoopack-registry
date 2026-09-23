@@ -28,13 +28,13 @@ export default function LoginPage() {
   if (!meLoading && user) return <Navigate to={returnTo} replace />
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-canvas px-4">
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <Link
           to="/"
           className="mb-8 flex items-center justify-center gap-2 text-lg font-semibold"
         >
-          <Package className="size-6 text-accent" />
+          <Package className="size-6 text-primary" />
           Odoopack
         </Link>
 
@@ -51,7 +51,7 @@ export default function LoginPage() {
                 <Spinner />
               </div>
             ) : providers.length === 0 ? (
-              <p className="text-sm text-muted">
+              <p className="text-sm text-muted-foreground">
                 No login providers configured.
               </p>
             ) : (
@@ -68,8 +68,8 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="mt-6 text-center text-sm text-muted">
-          <Link to="/" className="hover:text-fg">
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          <Link to="/" className="hover:text-foreground">
             Back to home
           </Link>
         </p>

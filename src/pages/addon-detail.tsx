@@ -49,7 +49,7 @@ export default function AddonDetailPage() {
   const navigate = useNavigate()
 
   if (isLoading) return <DetailSkeleton />
-  if (isError) return <p className="text-danger">Could not load addon.</p>
+  if (isError) return <p className="text-destructive">Could not load addon.</p>
   if (!addon) return <p>Addon not found.</p>
 
   const isOwner = user?.id === addon.repo?.owner_id
@@ -64,7 +64,7 @@ export default function AddonDetailPage() {
     <div className="flex flex-col gap-6">
       <Link
         to="/"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted transition-colors hover:text-fg"
+        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         Back
@@ -81,9 +81,9 @@ export default function AddonDetailPage() {
             </Badge>
           </div>
           {latest?.summary && (
-            <p className="max-w-2xl text-sm text-muted">{latest.summary}</p>
+            <p className="max-w-2xl text-sm text-muted-foreground">{latest.summary}</p>
           )}
-          <div className="flex items-center gap-2 text-sm text-muted">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Avatar hash={addon.repo?.owner?.gravatar_hash} size={20} />
             {addon.repo?.owner?.username ?? "-"}
           </div>
@@ -119,7 +119,7 @@ export default function AddonDetailPage() {
             {addon.repo ? (
               <Link
                 to={`/repos/${addon.repo.id}`}
-                className="break-all text-accent"
+                className="break-all text-primary"
               >
                 <code>{addon.repo.git_url}</code>
               </Link>
@@ -131,7 +131,7 @@ export default function AddonDetailPage() {
             {addon.subpath ? (
               <code>{addon.subpath}</code>
             ) : (
-              <span className="text-muted">(repo root)</span>
+              <span className="text-muted-foreground">(repo root)</span>
             )}
           </Detail>
           <Detail label="Default branch">
@@ -146,7 +146,7 @@ export default function AddonDetailPage() {
                   : ""}
               </span>
             ) : (
-              <span className="text-muted">none (anonymous clone)</span>
+              <span className="text-muted-foreground">none (anonymous clone)</span>
             )}
           </Detail>
           {latest?.license && (
@@ -164,7 +164,7 @@ export default function AddonDetailPage() {
                 href={latest.website}
                 target="_blank"
                 rel="noreferrer"
-                className="break-all text-accent"
+                className="break-all text-primary"
               >
                 {latest.website}
               </a>
@@ -178,7 +178,7 @@ export default function AddonDetailPage() {
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">
           Versions{" "}
-          <span className="font-normal text-muted">({versions.length})</span>
+          <span className="font-normal text-muted-foreground">({versions.length})</span>
         </h2>
         {versions.length === 0 ? (
           <EmptyState
@@ -208,15 +208,15 @@ export default function AddonDetailPage() {
                       {v.is_latest && <Badge variant="success">latest</Badge>}
                     </span>
                   </TD>
-                  <TD className="text-muted">
+                  <TD className="text-muted-foreground">
                     <span className="text-xs">{v.ref_type}</span>{" "}
                     <code className="text-xs">{v.ref_value.slice(0, 8)}</code>
                   </TD>
                   <TD>
                     <StatusBadge status={v.status} />
                   </TD>
-                  <TD className="text-muted">{formatSize(v.size_bytes)}</TD>
-                  <TD className="text-muted">
+                  <TD className="text-muted-foreground">{formatSize(v.size_bytes)}</TD>
+                  <TD className="text-muted-foreground">
                     {v.built_at
                       ? new Date(v.built_at).toLocaleDateString()
                       : "-"}
@@ -225,13 +225,13 @@ export default function AddonDetailPage() {
                     {v.status === "ready" ? (
                       <a
                         href={`/api/v1/addons/${addon.id}/versions/${encodeURIComponent(v.version)}/download`}
-                        className="inline-flex items-center gap-1 text-accent"
+                        className="inline-flex items-center gap-1 text-primary"
                       >
                         <Download className="size-4" />
                         Download
                       </a>
                     ) : (
-                      <span className="text-muted">-</span>
+                      <span className="text-muted-foreground">-</span>
                     )}
                   </TD>
                   {isOwner && (
@@ -263,9 +263,9 @@ export default function AddonDetailPage() {
       </section>
 
       {isOwner && (
-        <Card className="border-danger/30 p-5">
-          <h2 className="text-base font-semibold text-danger">Danger zone</h2>
-          <p className="mt-1 text-sm text-muted">
+        <Card className="border-destructive/30 p-5">
+          <h2 className="text-base font-semibold text-destructive">Danger zone</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             Removes the addon, all its versions, and built zipballs. The
             underlying repo stays.
           </p>
@@ -290,7 +290,7 @@ export default function AddonDetailPage() {
             />
           </div>
           {deleteAddon.isError && (
-            <p className="mt-2 text-sm text-danger">
+            <p className="mt-2 text-sm text-destructive">
               Delete failed: {deleteAddon.error.message}
             </p>
           )}
@@ -311,11 +311,11 @@ function RequiresSection({ versions }: { versions: AddonVersion[] }) {
   return (
     <Card>
       <div className="flex items-center gap-2 border-b border-border p-4 font-medium">
-        <Boxes className="size-4 text-muted" />
+        <Boxes className="size-4 text-muted-foreground" />
         Requires
-        <span className="font-normal text-muted">({deps.length})</span>
+        <span className="font-normal text-muted-foreground">({deps.length})</span>
         {target?.version && (
-          <span className="ml-auto text-xs font-normal text-muted">
+          <span className="ml-auto text-xs font-normal text-muted-foreground">
             for {target.version}
           </span>
         )}
@@ -329,12 +329,12 @@ function RequiresSection({ versions }: { versions: AddonVersion[] }) {
             {dep.addon_id ? (
               <Link
                 to={`/addons/${dep.addon_id}`}
-                className="font-mono text-accent"
+                className="font-mono text-primary"
               >
                 {dep.module}
               </Link>
             ) : (
-              <code className="font-mono text-muted">{dep.module}</code>
+              <code className="font-mono text-muted-foreground">{dep.module}</code>
             )}
             {dep.access === "external" && (
               <Badge variant="neutral">external</Badge>
@@ -352,7 +352,7 @@ function RequiresSection({ versions }: { versions: AddonVersion[] }) {
 function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
       <dd>{children}</dd>
@@ -363,8 +363,8 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
 function InstallSnippet({ name }: { name: string }) {
   const cmd = `odoopack add ${name}`
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 font-mono text-sm">
-      <span className="select-none text-muted">$</span>
+    <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 font-mono text-sm">
+      <span className="select-none text-muted-foreground">$</span>
       <code className="flex-1 truncate">{cmd}</code>
       <CopyButton value={cmd} />
     </div>
@@ -391,7 +391,7 @@ function ReadmeSection({
     <Card>
       <div className="flex items-center justify-between gap-3 border-b border-border p-4">
         <div className="flex items-center gap-2 font-medium">
-          <FileText className="size-4 text-muted" />
+          <FileText className="size-4 text-muted-foreground" />
           README
         </div>
         <Select
@@ -412,9 +412,9 @@ function ReadmeSection({
             <Spinner />
           </div>
         ) : isError ? (
-          <p className="text-sm text-danger">Could not load README.</p>
+          <p className="text-sm text-destructive">Could not load README.</p>
         ) : !data ? (
-          <p className="text-sm text-muted">No README for this version.</p>
+          <p className="text-sm text-muted-foreground">No README for this version.</p>
         ) : (
           <div
             className="prose prose-sm max-w-none dark:prose-invert"

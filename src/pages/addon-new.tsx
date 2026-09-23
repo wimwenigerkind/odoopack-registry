@@ -102,8 +102,8 @@ function NewAddonForm({
         <Card className="flex flex-col items-center gap-3 p-8 text-center">
           <CheckCircle2 className="size-10 text-success" />
           <h1 className="text-xl font-semibold">Addon registered</h1>
-          <p className="text-sm text-muted">
-            <strong className="text-fg">{addon.name}</strong> has been
+          <p className="text-sm text-muted-foreground">
+            <strong className="text-foreground">{addon.name}</strong> has been
             registered.
           </p>
           <div className="mt-2 flex gap-2">
@@ -126,7 +126,7 @@ function NewAddonForm({
     <div className="flex flex-col gap-6">
       <Link
         to="/"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted transition-colors hover:text-fg"
+        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         Back
@@ -255,7 +255,7 @@ function NewAddonForm({
         </Card>
 
         {register.isError && (
-          <p className="text-sm text-danger">
+          <p className="text-sm text-destructive">
             Registration failed: {register.error.message}
           </p>
         )}
@@ -272,21 +272,21 @@ function NewAddonForm({
           <div className="flex flex-col gap-3 text-sm">
             <div>
               <p className="font-medium">Repository</p>
-              <p className="text-muted">
+              <p className="text-muted-foreground">
                 Reuse a repo you own or add a new URL. Private repos need a git
                 integration, set up in your profile.
               </p>
             </div>
             <div>
               <p className="font-medium">Subpath</p>
-              <p className="text-muted">
+              <p className="text-muted-foreground">
                 Path to the module inside the repo. Leave empty if it lives at
                 the repo root.
               </p>
             </div>
             <div>
               <p className="font-medium">Visibility</p>
-              <p className="text-muted">
+              <p className="text-muted-foreground">
                 Public addons are listed for everyone. Private addons are
                 restricted to you and granted groups.
               </p>

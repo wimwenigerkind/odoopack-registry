@@ -35,7 +35,7 @@ export default function RepoDetailPage() {
   const navigate = useNavigate()
 
   if (isLoading) return <RepoSkeleton />
-  if (isError) return <p className="text-danger">Could not load repo.</p>
+  if (isError) return <p className="text-destructive">Could not load repo.</p>
   if (!repo) return <p>Repo not found.</p>
 
   const isOwner = user?.id === repo.owner_id
@@ -45,7 +45,7 @@ export default function RepoDetailPage() {
     <div className="flex flex-col gap-6">
       <Link
         to="/"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted transition-colors hover:text-fg"
+        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         Back
@@ -53,7 +53,7 @@ export default function RepoDetailPage() {
 
       <div>
         <h1 className="text-2xl font-semibold">Repository</h1>
-        <code className="mt-1 block break-all text-sm text-muted">
+        <code className="mt-1 block break-all text-sm text-muted-foreground">
           {repo.git_url}
         </code>
       </div>
@@ -79,7 +79,7 @@ export default function RepoDetailPage() {
                     : ""}
                 </span>
               ) : (
-                <span className="text-muted">none (anonymous clone)</span>
+                <span className="text-muted-foreground">none (anonymous clone)</span>
               )}
             </Detail>
           )}
@@ -92,7 +92,7 @@ export default function RepoDetailPage() {
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-lg font-semibold">
             Addons{" "}
-            <span className="font-normal text-muted">({addons.length})</span>
+            <span className="font-normal text-muted-foreground">({addons.length})</span>
           </h2>
           {isOwner && (
             <Link
@@ -123,11 +123,11 @@ export default function RepoDetailPage() {
               {addons.map((a) => (
                 <TR key={a.id}>
                   <TD className="font-medium">
-                    <Link to={`/addons/${a.id}`} className="hover:text-accent">
+                    <Link to={`/addons/${a.id}`} className="hover:text-primary">
                       {a.name}
                     </Link>
                   </TD>
-                  <TD className="text-muted">
+                  <TD className="text-muted-foreground">
                     {a.subpath ? (
                       <code>{a.subpath}</code>
                     ) : (
@@ -141,7 +141,7 @@ export default function RepoDetailPage() {
                       {a.visibility}
                     </Badge>
                   </TD>
-                  <TD className="text-muted">{a.versions?.length ?? 0}</TD>
+                  <TD className="text-muted-foreground">{a.versions?.length ?? 0}</TD>
                 </TR>
               ))}
             </TBody>
@@ -180,7 +180,7 @@ function Detail({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
       <dd>{children}</dd>
@@ -239,7 +239,7 @@ function RepoSettings({ repo }: { repo: Repo }) {
         </Field>
 
         {update.isError && (
-          <p className="text-sm text-danger">{update.error.message}</p>
+          <p className="text-sm text-destructive">{update.error.message}</p>
         )}
 
         <div className="flex justify-end">
@@ -265,9 +265,9 @@ function DangerZone({
   const blocked = addonCount > 0
 
   return (
-    <Card className="border-danger/30 p-5">
-      <h2 className="text-base font-semibold text-danger">Danger zone</h2>
-      <p className="mt-1 text-sm text-muted">
+    <Card className="border-destructive/30 p-5">
+      <h2 className="text-base font-semibold text-destructive">Danger zone</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
         {blocked
           ? `Delete the ${addonCount} addon${addonCount === 1 ? "" : "s"} first to remove this repo.`
           : "Permanently removes this repo. This cannot be undone."}
@@ -289,7 +289,7 @@ function DangerZone({
         />
       </div>
       {del.isError && (
-        <p className="mt-2 text-sm text-danger">
+        <p className="mt-2 text-sm text-destructive">
           Delete failed: {del.error.message}
         </p>
       )}

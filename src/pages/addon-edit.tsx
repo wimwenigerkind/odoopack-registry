@@ -26,7 +26,7 @@ export default function AddonEditPage() {
       </div>
     )
   if (isError || !addon)
-    return <p className="text-danger">Could not load addon.</p>
+    return <p className="text-destructive">Could not load addon.</p>
 
   return <EditForm key={addon.id} addon={addon} />
 }
@@ -50,7 +50,7 @@ function EditForm({ addon }: { addon: Addon }) {
     <div className="flex flex-col gap-6">
       <Link
         to={`/addons/${addon.id}`}
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted transition-colors hover:text-fg"
+        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         Back to addon
@@ -58,7 +58,7 @@ function EditForm({ addon }: { addon: Addon }) {
 
       <div>
         <h1 className="text-2xl font-semibold">Edit {addon.name}</h1>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 text-sm text-muted-foreground">
           Manage addon-level settings. Repository settings live on the repo.
         </p>
       </div>
@@ -110,7 +110,7 @@ function EditForm({ addon }: { addon: Addon }) {
             </Field>
 
             {update.isError && (
-              <p className="text-sm text-danger">
+              <p className="text-sm text-destructive">
                 Update failed: {update.error.message}
               </p>
             )}
@@ -131,13 +131,13 @@ function EditForm({ addon }: { addon: Addon }) {
 
         <Card className="flex h-fit flex-col gap-4 p-5">
           <div className="flex items-center gap-2 font-medium">
-            <FolderGit2 className="size-4 text-muted" />
+            <FolderGit2 className="size-4 text-muted-foreground" />
             Repository
           </div>
 
           <dl className="flex flex-col gap-3 text-sm">
             <div className="flex flex-col gap-1">
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Git URL
               </dt>
               <dd>
@@ -147,7 +147,7 @@ function EditForm({ addon }: { addon: Addon }) {
               </dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Default branch
               </dt>
               <dd>
@@ -155,7 +155,7 @@ function EditForm({ addon }: { addon: Addon }) {
               </dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Integration
               </dt>
               <dd>
@@ -167,7 +167,7 @@ function EditForm({ addon }: { addon: Addon }) {
                       : ""}
                   </span>
                 ) : (
-                  <span className="text-muted">none (anonymous clone)</span>
+                  <span className="text-muted-foreground">none (anonymous clone)</span>
                 )}
               </dd>
             </div>

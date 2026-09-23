@@ -60,7 +60,7 @@ export default function AdminGroupsPage() {
           </Button>
         </form>
         {createGroup.isError && (
-          <p className="mt-2 text-sm text-danger">
+          <p className="mt-2 text-sm text-destructive">
             Failed to create: {createGroup.error.message}
           </p>
         )}
@@ -71,7 +71,7 @@ export default function AdminGroupsPage() {
           <Spinner className="size-6" />
         </div>
       ) : isError ? (
-        <p className="text-danger">Could not load groups.</p>
+        <p className="text-destructive">Could not load groups.</p>
       ) : (groups ?? []).length === 0 ? (
         <EmptyState title="No groups yet" description="Create a group above." />
       ) : (
@@ -89,12 +89,12 @@ export default function AdminGroupsPage() {
                 <TD className="font-medium">
                   <Link
                     to={`/admin/groups/${g.id}`}
-                    className="hover:text-accent"
+                    className="hover:text-primary"
                   >
                     {g.name}
                   </Link>
                 </TD>
-                <TD className="text-muted">
+                <TD className="text-muted-foreground">
                   {new Date(g.created_at).toLocaleDateString()}
                 </TD>
                 <TD className="text-right">
@@ -103,7 +103,7 @@ export default function AdminGroupsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-danger hover:bg-danger/10 hover:text-danger"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                         aria-label={`Delete group ${g.name}`}
                       >
                         <Trash2 className="size-4" />

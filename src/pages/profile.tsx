@@ -56,14 +56,14 @@ export default function ProfilePage() {
         <Spinner className="size-6" />
       </div>
     )
-  if (isError) return <p className="text-danger">Could not load profile.</p>
+  if (isError) return <p className="text-destructive">Could not load profile.</p>
   if (!user) return <p>You must be logged in.</p>
 
   return (
     <div className="flex flex-col gap-6">
       <Link
         to="/"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted transition-colors hover:text-fg"
+        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         Back
@@ -75,8 +75,8 @@ export default function ProfilePage() {
           <h1 className="truncate text-2xl font-semibold">
             {user.username || user.email}
           </h1>
-          <p className="text-sm text-muted">{user.email}</p>
-          <p className="mt-1 text-xs text-muted">
+          <p className="text-sm text-muted-foreground">{user.email}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             Member since {new Date(user.created_at).toLocaleDateString()}
             {" · "}
             <code>{user.id}</code>
@@ -109,7 +109,7 @@ function AccountsCard({ identities }: { identities: Identity[] }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {identities.length === 0 ? (
-          <p className="text-sm text-muted">No connected accounts.</p>
+          <p className="text-sm text-muted-foreground">No connected accounts.</p>
         ) : (
           <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
             {identities.map((i) => (
@@ -119,7 +119,7 @@ function AccountsCard({ identities }: { identities: Identity[] }) {
               >
                 <span className="flex items-center gap-2">
                   <span className="font-medium capitalize">{i.provider}</span>
-                  <span className="text-xs text-muted">
+                  <span className="text-xs text-muted-foreground">
                     linked {new Date(i.created_at).toLocaleDateString()}
                   </span>
                 </span>
@@ -128,7 +128,7 @@ function AccountsCard({ identities }: { identities: Identity[] }) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-danger hover:bg-danger/10 hover:text-danger"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                     >
                       Unlink
                     </Button>
@@ -144,13 +144,13 @@ function AccountsCard({ identities }: { identities: Identity[] }) {
           </ul>
         )}
         {unlink.isError && (
-          <p className="text-sm text-danger">
+          <p className="text-sm text-destructive">
             Unlink failed: {unlink.error.message}
           </p>
         )}
         {providers.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-            <span className="text-sm text-muted">Link another:</span>
+            <span className="text-sm text-muted-foreground">Link another:</span>
             {providers.map((p) => (
               <a
                 key={p.name}
@@ -183,7 +183,7 @@ function MyReposCard() {
             <Spinner />
           </div>
         ) : isError ? (
-          <p className="text-sm text-danger">Could not load repos.</p>
+          <p className="text-sm text-destructive">Could not load repos.</p>
         ) : !repos || repos.length === 0 ? (
           <EmptyState
             title="No repositories"
@@ -213,20 +213,20 @@ function MyReposCard() {
                   <TD className="font-medium">
                     <Link
                       to={`/repos/${r.id}`}
-                      className="break-all hover:text-accent"
+                      className="break-all hover:text-primary"
                     >
                       <code>{r.git_url}</code>
                     </Link>
                   </TD>
-                  <TD className="text-muted">
+                  <TD className="text-muted-foreground">
                     <code>{r.default_branch}</code>
                   </TD>
-                  <TD className="text-muted">
+                  <TD className="text-muted-foreground">
                     {r.integration
                       ? `${r.integration.provider}${r.integration.account_name ? ` (${r.integration.account_name})` : ""}`
                       : "-"}
                   </TD>
-                  <TD className="text-muted">
+                  <TD className="text-muted-foreground">
                     {new Date(r.created_at).toLocaleDateString()}
                   </TD>
                 </TR>
@@ -282,7 +282,7 @@ function TokensCard() {
           </Button>
         </form>
         {createToken.isError && (
-          <p className="text-sm text-danger">
+          <p className="text-sm text-destructive">
             Error: {createToken.error.message}
           </p>
         )}
@@ -292,9 +292,9 @@ function TokensCard() {
             <Spinner />
           </div>
         ) : isError ? (
-          <p className="text-sm text-danger">Could not load tokens.</p>
+          <p className="text-sm text-destructive">Could not load tokens.</p>
         ) : !tokens || tokens.length === 0 ? (
-          <p className="text-sm text-muted">No tokens yet.</p>
+          <p className="text-sm text-muted-foreground">No tokens yet.</p>
         ) : (
           <Table>
             <THead>
@@ -313,10 +313,10 @@ function TokensCard() {
                   <TD>
                     <SecretValue value={t.token} />
                   </TD>
-                  <TD className="text-muted">
+                  <TD className="text-muted-foreground">
                     {new Date(t.created_at).toLocaleDateString()}
                   </TD>
-                  <TD className="text-muted">
+                  <TD className="text-muted-foreground">
                     {t.last_used_at
                       ? new Date(t.last_used_at).toLocaleString()
                       : "never"}
@@ -378,16 +378,16 @@ function IntegrationsCard() {
             <Spinner />
           </div>
         ) : providersError ? (
-          <p className="text-sm text-danger">
+          <p className="text-sm text-destructive">
             Could not load providers: {providersErr?.message}
           </p>
         ) : providers.length === 0 ? (
-          <p className="text-sm text-muted">
+          <p className="text-sm text-muted-foreground">
             No integration providers configured on this server.
           </p>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted">Connect:</span>
+            <span className="text-sm text-muted-foreground">Connect:</span>
             {providers.map((p) => (
               <a
                 key={p.name}
@@ -408,9 +408,9 @@ function IntegrationsCard() {
             <Spinner />
           </div>
         ) : isError ? (
-          <p className="text-sm text-danger">Could not load integrations.</p>
+          <p className="text-sm text-destructive">Could not load integrations.</p>
         ) : !integrations || integrations.length === 0 ? (
-          <p className="text-sm text-muted">No integrations connected.</p>
+          <p className="text-sm text-muted-foreground">No integrations connected.</p>
         ) : (
           <div className="flex flex-col gap-3">
             {integrations.map((i) => (
@@ -453,7 +453,7 @@ function IntegrationPanel({
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium capitalize">{i.provider}</span>
           {i.account_name && <Badge variant="accent">{i.account_name}</Badge>}
-          <span className="text-xs text-muted">
+          <span className="text-xs text-muted-foreground">
             connected {new Date(i.created_at).toLocaleDateString()}
           </span>
         </div>
@@ -476,7 +476,7 @@ function IntegrationPanel({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Webhook URL">
           <div className="flex items-center gap-1">
-            <code className="flex-1 truncate rounded-md bg-fg/5 px-2 py-1 text-xs">
+            <code className="flex-1 truncate rounded-md bg-foreground/5 px-2 py-1 text-xs">
               {url}
             </code>
             <CopyButton value={url} />
@@ -510,7 +510,7 @@ function IntegrationPanel({
             </p>
           )}
           {createHook.isError && (
-            <p className="text-xs text-danger">{createHook.error.message}</p>
+            <p className="text-xs text-destructive">{createHook.error.message}</p>
           )}
         </form>
       )}

@@ -19,7 +19,7 @@ export function SecretValue({
 
   return (
     <div className={`flex items-center gap-1 ${className ?? ""}`}>
-      <code className="flex-1 truncate rounded-md bg-fg/5 px-2 py-1 text-xs">
+      <code className="flex-1 truncate rounded-md bg-foreground/5 px-2 py-1 text-xs">
         {hasValue ? (revealed ? value : MASK) : emptyText}
       </code>
       {hasValue && (

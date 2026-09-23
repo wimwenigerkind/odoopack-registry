@@ -21,12 +21,12 @@ export function DialogContent({
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
       <DialogPrimitive.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-surface p-6 shadow-xl focus:outline-none",
+          "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card p-6 shadow-xl focus:outline-none",
           className,
         )}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 text-muted transition-colors hover:text-fg">
+        <DialogPrimitive.Close className="absolute right-4 top-4 text-muted-foreground transition-colors hover:text-foreground">
           <X className="size-4" />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
@@ -44,7 +44,7 @@ export function DialogTitle({ children }: { children: ReactNode }) {
 
 export function DialogDescription({ children }: { children: ReactNode }) {
   return (
-    <DialogPrimitive.Description className="mt-1 text-sm text-muted">
+    <DialogPrimitive.Description className="mt-1 text-sm text-muted-foreground">
       {children}
     </DialogPrimitive.Description>
   )

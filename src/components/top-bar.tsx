@@ -29,7 +29,7 @@ function SearchBar() {
         navigate(value ? `/?q=${encodeURIComponent(value)}` : "/")
       }}
     >
-      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -49,7 +49,7 @@ function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Account menu"
         >
           <Avatar hash={user.gravatar_hash} size={32} />
@@ -102,13 +102,13 @@ function SignInButton() {
 export function TopBar() {
   const { data: user, isLoading } = useMe()
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-surface/80 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1100px] items-center gap-3 px-4">
         <Link
           to="/"
           className="flex shrink-0 items-center gap-2 font-semibold"
         >
-          <Package className="size-5 text-accent" />
+          <Package className="size-5 text-primary" />
           <span className="hidden sm:inline">Odoopack</span>
         </Link>
         <SearchBar />

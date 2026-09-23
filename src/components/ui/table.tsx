@@ -19,7 +19,7 @@ export function THead({
 }: HTMLAttributes<HTMLTableSectionElement>) {
   return (
     <thead
-      className={cn("border-b border-border bg-fg/[0.03] text-muted", className)}
+      className={cn("border-b border-border bg-foreground/[0.03] text-muted-foreground", className)}
       {...props}
     />
   )

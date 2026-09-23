@@ -24,7 +24,7 @@ export default function AdminUsersPage() {
           <Spinner className="size-6" />
         </div>
       ) : isError ? (
-        <p className="text-danger">Could not load users.</p>
+        <p className="text-destructive">Could not load users.</p>
       ) : (
         <Table>
           <THead>
@@ -39,15 +39,15 @@ export default function AdminUsersPage() {
             {(users ?? []).map((u) => (
               <TR key={u.id}>
                 <TD className="font-medium">{u.email}</TD>
-                <TD className="text-muted">{u.username || "-"}</TD>
+                <TD className="text-muted-foreground">{u.username || "-"}</TD>
                 <TD>
                   {u.is_admin ? (
                     <Badge variant="accent">admin</Badge>
                   ) : (
-                    <span className="text-muted">user</span>
+                    <span className="text-muted-foreground">user</span>
                   )}
                 </TD>
-                <TD className="text-muted">
+                <TD className="text-muted-foreground">
                   <code className="text-xs">{u.id}</code>
                 </TD>
               </TR>

@@ -17,8 +17,8 @@ export function AdminNav() {
             cn(
               "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
               isActive
-                ? "border-accent text-fg"
-                : "border-transparent text-muted hover:text-fg",
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
             )
           }
         >

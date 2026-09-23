@@ -43,7 +43,7 @@ export default function HomePage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Addons</h1>
-          <p className="text-sm text-muted">Browse and install Odoo addons.</p>
+          <p className="text-sm text-muted-foreground">Browse and install Odoo addons.</p>
         </div>
         {user && (
           <Link to="/addons/new" className={buttonVariants()}>
@@ -118,11 +118,11 @@ function AddonCard({ addon }: { addon: Addon }) {
   const versions = addon.versions?.length ?? 0
   return (
     <Link to={`/addons/${addon.id}`} className="group block h-full">
-      <Card className="flex h-full flex-col gap-4 p-5 transition-colors hover:border-accent/50">
+      <Card className="flex h-full flex-col gap-4 p-5 transition-colors hover:border-primary/50">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
-            <Package className="size-4 shrink-0 text-muted" />
-            <span className="truncate font-medium group-hover:text-accent">
+            <Package className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate font-medium group-hover:text-primary">
               {addon.name}
             </span>
           </div>
@@ -130,7 +130,7 @@ function AddonCard({ addon }: { addon: Addon }) {
             {addon.visibility}
           </Badge>
         </div>
-        <div className="mt-auto flex items-center justify-between text-xs text-muted">
+        <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground">
           <span>
             {versions} version{versions === 1 ? "" : "s"}
           </span>

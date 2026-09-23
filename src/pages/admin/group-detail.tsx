@@ -33,7 +33,7 @@ import { useGroup } from "@/hooks/admin/use-group"
 import { useUsers } from "@/hooks/admin/use-users"
 import type { Addon, User } from "@/lib/types"
 
-const dangerGhost = "text-danger hover:bg-danger/10 hover:text-danger"
+const dangerGhost = "text-destructive hover:bg-destructive/10 hover:text-destructive"
 
 export default function AdminGroupDetailPage() {
   const { id = "" } = useParams()
@@ -66,7 +66,7 @@ export default function AdminGroupDetailPage() {
         <Spinner className="size-6" />
       </div>
     )
-  if (isError) return <p className="text-danger">Could not load group.</p>
+  if (isError) return <p className="text-destructive">Could not load group.</p>
   if (!group) return <p>Group not found.</p>
 
   const memberIDs = new Set((members ?? []).map((m) => m.user_id))
@@ -96,7 +96,7 @@ export default function AdminGroupDetailPage() {
     <div className="flex flex-col gap-6">
       <Link
         to="/admin/groups"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted transition-colors hover:text-fg"
+        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         Back to groups
@@ -132,7 +132,7 @@ export default function AdminGroupDetailPage() {
           </form>
 
           {(members ?? []).length === 0 ? (
-            <p className="text-sm text-muted">No members.</p>
+            <p className="text-sm text-muted-foreground">No members.</p>
           ) : (
             <Table>
               <THead>
@@ -152,7 +152,7 @@ export default function AdminGroupDetailPage() {
                           <>
                             {u.email}
                             {u.username && (
-                              <span className="text-muted">
+                              <span className="text-muted-foreground">
                                 {" "}
                                 ({u.username})
                               </span>
@@ -162,7 +162,7 @@ export default function AdminGroupDetailPage() {
                           <code className="text-xs">{m.user_id}</code>
                         )}
                       </TD>
-                      <TD className="text-muted">
+                      <TD className="text-muted-foreground">
                         {new Date(m.created_at).toLocaleDateString()}
                       </TD>
                       <TD className="text-right">
@@ -213,7 +213,7 @@ export default function AdminGroupDetailPage() {
           </form>
 
           {(addonAccess ?? []).length === 0 ? (
-            <p className="text-sm text-muted">No addon access granted.</p>
+            <p className="text-sm text-muted-foreground">No addon access granted.</p>
           ) : (
             <Table>
               <THead>
@@ -233,7 +233,7 @@ export default function AdminGroupDetailPage() {
                         {addon ? (
                           <Link
                             to={`/addons/${addon.id}`}
-                            className="hover:text-accent"
+                            className="hover:text-primary"
                           >
                             {addon.name}
                           </Link>
@@ -256,7 +256,7 @@ export default function AdminGroupDetailPage() {
                           "-"
                         )}
                       </TD>
-                      <TD className="text-muted">
+                      <TD className="text-muted-foreground">
                         {new Date(a.created_at).toLocaleDateString()}
                       </TD>
                       <TD className="text-right">
