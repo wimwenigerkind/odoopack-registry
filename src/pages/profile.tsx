@@ -97,30 +97,19 @@ export default function ProfilePage() {
             <Badge variant="neutral">
               Since {new Date(user.created_at).toLocaleDateString()}
             </Badge>
-            <span className="inline-flex items-center gap-1 rounded-md bg-foreground/5 px-2 py-1 font-mono text-xs text-muted-foreground">
-              {user.id.slice(0, 8)}
-              <CopyButton value={user.id} />
-            </span>
           </div>
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <Card className="divide-y divide-border sm:flex sm:divide-x sm:divide-y-0">
         {stats.map((s) => (
-          <StatCard key={s.label} {...s} />
+          <StatCell key={s.label} {...s} />
         ))}
-      </div>
+      </Card>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-6 lg:col-span-2">
-          <MyReposCard />
-          <TokensCard />
-        </div>
-        <div className="flex flex-col gap-6">
-          <AccountsCard identities={identities} />
-        </div>
-      </div>
-
+      <MyReposCard />
+      <TokensCard />
+      <AccountsCard identities={identities} />
       <IntegrationsCard />
     </div>
   )
@@ -132,9 +121,9 @@ type StatItem = {
   icon: ComponentType<{ className?: string }>
 }
 
-function StatCard({ label, value, icon: Icon }: StatItem) {
+function StatCell({ label, value, icon: Icon }: StatItem) {
   return (
-    <Card className="flex items-center gap-3 p-4">
+    <div className="flex flex-1 items-center gap-3 p-5">
       <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
         <Icon className="size-5" />
       </span>
@@ -144,7 +133,7 @@ function StatCard({ label, value, icon: Icon }: StatItem) {
         </div>
         <div className="mt-1 truncate text-xs text-muted-foreground">{label}</div>
       </div>
-    </Card>
+    </div>
   )
 }
 
