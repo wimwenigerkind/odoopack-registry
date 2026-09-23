@@ -76,10 +76,16 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <AccountsCard identities={user.identities ?? []} />
-      <MyReposCard />
-      <TokensCard />
-      <IntegrationsCard />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="flex flex-col gap-6 lg:col-span-2">
+          <MyReposCard />
+          <TokensCard />
+          <IntegrationsCard />
+        </div>
+        <div className="flex flex-col gap-6">
+          <AccountsCard identities={user.identities ?? []} />
+        </div>
+      </div>
     </div>
   )
 }
