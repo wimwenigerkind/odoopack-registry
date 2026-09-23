@@ -158,6 +158,7 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, re
 	{
 		api.GET("/me", requireAuth, authH.Me)
 		api.GET("/addons", optionalAuth, addons.List)
+		api.GET("/series", optionalAuth, addons.ListSeries)
 		api.POST("/addons", requireAuth, addons.Register)
 		api.GET("/addons/:id", optionalAuth, addons.Get)
 		api.PUT("/addons/:id", requireAuth, addons.Update)

@@ -168,6 +168,18 @@ func (r *AddonRepository) VisibleQuery(userID *uuid.UUID, isAdmin bool, s AddonS
 	return db
 }
 
+func (r *AddonRepository) VisibleReadyVersions(userID *uuid.UUID, isAdmin bool) ([]string, error) {
+	visibleIDs := r.VisibleQuery(userID, isAdmin, AddonSearch{}).Select("addons.id")
+	var versions []string
+	err := r.db.
+		Table("addon_versions AS av").
+		Where("av.status = ?", models.StatusReady).
+		Where("av.addon_id IN (?)", visibleIDs).
+		Distinct().
+		Pluck("av.version", &versions).Error
+	return versions, err
+}
+
 func (r *AddonRepository) ListVisibleTo(userID *uuid.UUID, isAdmin bool, nameFilter string) ([]models.Addon, error) {
 	var addons []models.Addon
 	q := r.db.

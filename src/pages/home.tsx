@@ -11,17 +11,22 @@ import {
 } from "@/components/ui"
 import { PageHeader } from "@/components/page-header"
 import { useAddons } from "@/hooks/addons/use-addons"
+import { useSeries } from "@/hooks/addons/use-series"
 import { useMe } from "@/hooks/auth/use-me"
 import type { Addon } from "@/lib/types"
 
-const SERIES = ["19.0", "18.0", "17.0", "16.0"]
-
 export default function HomePage() {
   const { data: user } = useMe()
+  const { data: seriesOptions } = useSeries()
   const [params, setParams] = useSearchParams()
 
   const q = params.get("q")?.trim() ?? ""
   const series = params.get("series") ?? ""
+
+  const seriesFilterOptions =
+    series && !(seriesOptions ?? []).includes(series)
+      ? [series, ...(seriesOptions ?? [])]
+      : (seriesOptions ?? [])
 
   const {
     data,
@@ -62,7 +67,7 @@ export default function HomePage() {
           className="h-9 w-auto"
         >
           <option value="">All series</option>
-          {SERIES.map((s) => (
+          {seriesFilterOptions.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>

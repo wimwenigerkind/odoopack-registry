@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -15,6 +17,7 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
 	"github.com/wimwenigerkind/odoopack-registry/internal/validate"
+	odoosemver "github.com/wimwenigerkind/odoopack-semver"
 	paginate "github.com/wimwenigerkind/paginate"
 	ginx "github.com/wimwenigerkind/paginate/ginx"
 )
@@ -116,6 +119,52 @@ func (h *AddonHandler) List(c *gin.Context) {
 		annotateVersions(page.Data[i].Versions)
 	}
 	c.JSON(http.StatusOK, page)
+}
+
+func (h *AddonHandler) ListSeries(c *gin.Context) {
+	versions, err := h.addons.VisibleReadyVersions(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+
+	seen := make(map[string]struct{})
+	for _, vs := range versions {
+		v, err := odoosemver.Parse(vs)
+		if err != nil {
+			continue
+		}
+		seen[v.SeriesString()] = struct{}{}
+	}
+
+	series := make([]string, 0, len(seen))
+	for s := range seen {
+		series = append(series, s)
+	}
+	sort.Slice(series, func(i, j int) bool {
+		return compareSeries(series[i], series[j]) > 0
+	})
+
+	c.JSON(http.StatusOK, gin.H{"series": series})
+}
+
+func compareSeries(a, b string) int {
+	am, an := splitSeries(a)
+	bm, bn := splitSeries(b)
+	if am != bm {
+		return am - bm
+	}
+	return an - bn
+}
+
+func splitSeries(s string) (int, int) {
+	parts := strings.SplitN(s, ".", 2)
+	major, _ := strconv.Atoi(parts[0])
+	minor := 0
+	if len(parts) > 1 {
+		minor, _ = strconv.Atoi(parts[1])
+	}
+	return major, minor
 }
 
 func (h *AddonHandler) Register(c *gin.Context) {
