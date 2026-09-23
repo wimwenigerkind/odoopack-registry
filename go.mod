@@ -15,7 +15,7 @@ require (
 	github.com/wimwenigerkind/odoopack-semver v0.0.0-20260827211541-1f15691b59d7
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/oauth2 v0.37.0
-	gorm.io/driver/postgres v1.6.2
+	gorm.io/driver/postgres v1.6.3
 	gorm.io/gorm v1.31.2
 )
 
