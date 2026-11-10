@@ -1,65 +1,49 @@
 package handler
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 	"github.com/wimwenigerkind/odoopack-registry/internal/worker"
 )
 
 type WebhookHandler struct {
-	integrations *repository.IntegrationRepository
-	addons       *repository.AddonRepository
-	queue        *worker.Queue
+	addons *repository.AddonRepository
+	tokens *repository.ApiTokenRepository
+	queue  *worker.Queue
 }
 
-func NewWebhookHandler(integrations *repository.IntegrationRepository, addons *repository.AddonRepository, queue *worker.Queue) *WebhookHandler {
-	return &WebhookHandler{integrations: integrations, addons: addons, queue: queue}
+func NewWebhookHandler(addons *repository.AddonRepository, tokens *repository.ApiTokenRepository, queue *worker.Queue) *WebhookHandler {
+	return &WebhookHandler{addons: addons, tokens: tokens, queue: queue}
 }
 
-type bitbucketPushPayload struct {
+type forgejoPushPayload struct {
 	Repository struct {
 		FullName string `json:"full_name"`
-		UUID     string `json:"uuid"`
 	} `json:"repository"`
-	Push struct {
-		Changes []struct {
-			New *struct {
-				Type string `json:"type"`
-				Name string `json:"name"`
-			} `json:"new"`
-		} `json:"changes"`
-	} `json:"push"`
 }
 
-func (h *WebhookHandler) Bitbucket(c *gin.Context) {
-	id, err := uuid.Parse(c.Param("integration_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid integration id"})
+func (h *WebhookHandler) Forgejo(c *gin.Context) {
+	ownerID, ok := bearerOwner(c, h.tokens)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or missing api token"})
 		return
 	}
 
-	it, err := h.integrations.GetByID(id)
-	if errors.Is(err, repository.ErrNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "integration not found"})
-		return
+	event := c.GetHeader("X-Forgejo-Event")
+	if event == "" {
+		event = c.GetHeader("X-Gitea-Event")
 	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
-		return
-	}
-	if it.Provider != "bitbucket" {
-		c.JSON(http.StatusConflict, gin.H{"error": "integration is not a bitbucket integration"})
+	if event != "push" {
+		c.JSON(http.StatusAccepted, gin.H{"status": "ignored", "event": event})
 		return
 	}
 
@@ -69,25 +53,7 @@ func (h *WebhookHandler) Bitbucket(c *gin.Context) {
 		return
 	}
 
-	sigHeader := c.GetHeader("X-Hub-Signature")
-	if !verifyBitbucketHMAC(it.HookSecret, body, sigHeader) {
-		slog.Warn("webhook signature mismatch",
-			"integration", it.ID,
-			"secret_present", it.HookSecret != "",
-			"sig_header", sigHeader,
-			"body_len", len(body),
-		)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
-		return
-	}
-
-	event := c.GetHeader("X-Event-Key")
-	if event != "repo:push" {
-		c.JSON(http.StatusAccepted, gin.H{"status": "ignored", "event": event})
-		return
-	}
-
-	var payload bitbucketPushPayload
+	var payload forgejoPushPayload
 	if err := json.Unmarshal(body, &payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json payload"})
 		return
@@ -99,12 +65,18 @@ func (h *WebhookHandler) Bitbucket(c *gin.Context) {
 		return
 	}
 
-	addons, err := h.addons.ListByOwnerAndRepoPath(it.OwnerID, repoPath)
+	addons, err := h.addons.ListByOwnerAndRepoPath(ownerID, repoPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
+	queued := h.enqueueSyncs(addons)
+	slog.Info("forgejo webhook", "owner", ownerID, "repo", repoPath, "queued", queued)
+	c.JSON(http.StatusOK, gin.H{"queued": queued})
+}
+
+func (h *WebhookHandler) enqueueSyncs(addons []models.Addon) int {
 	queued := 0
 	for _, addon := range addons {
 		if addon.Repo == nil {
@@ -124,21 +96,23 @@ func (h *WebhookHandler) Bitbucket(c *gin.Context) {
 		}
 		queued++
 	}
-	slog.Info("bitbucket webhook", "integration", it.ID, "repo", repoPath, "queued", queued)
-	c.JSON(http.StatusOK, gin.H{"queued": queued})
+	return queued
 }
 
-func verifyBitbucketHMAC(secret string, body []byte, header string) bool {
-	if secret == "" || header == "" {
-		return false
-	}
-	const prefix = "sha256="
+func bearerOwner(c *gin.Context, tokens *repository.ApiTokenRepository) (uuid.UUID, bool) {
+	const prefix = "Bearer "
+	header := c.GetHeader("Authorization")
 	if !strings.HasPrefix(header, prefix) {
-		return false
+		return uuid.Nil, false
 	}
-	sigHex := strings.TrimPrefix(header, prefix)
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
-	expected := hex.EncodeToString(mac.Sum(nil))
-	return hmac.Equal([]byte(expected), []byte(sigHex))
+	plain := strings.TrimSpace(header[len(prefix):])
+	if plain == "" {
+		return uuid.Nil, false
+	}
+	tok, err := tokens.GetByToken(plain)
+	if err != nil || tok == nil {
+		return uuid.Nil, false
+	}
+	_ = tokens.TouchLastUsed(tok.ID, time.Now())
+	return tok.UserID, true
 }

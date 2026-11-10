@@ -21,7 +21,6 @@ import {
   CardTitle,
   CardDescription,
   ConfirmDialog,
-  CopyButton,
   EmptyState,
   Field,
   Input,
@@ -37,7 +36,6 @@ import {
 import { useMe } from "@/hooks/auth/use-me"
 import { useProviders } from "@/hooks/auth/use-providers"
 import { useUnlinkIdentity } from "@/hooks/auth/use-unlink-identity"
-import { useCreateWorkspaceHook } from "@/hooks/integrations/use-create-workspace-hook"
 import {
   useDeleteIntegration,
   useIntegrationProviders,
@@ -494,83 +492,29 @@ function IntegrationPanel({
   onDisconnect: () => void
   disconnectPending: boolean
 }) {
-  const url = `${window.location.origin}/webhooks/${i.provider}/${i.id}`
-  const createHook = useCreateWorkspaceHook(i.id)
-  const [workspace, setWorkspace] = useState("")
-
-  const submitHook = (e: FormEvent) => {
-    e.preventDefault()
-    if (!workspace.trim()) return
-    createHook.mutate(workspace.trim(), { onSuccess: () => setWorkspace("") })
-  }
-
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium capitalize">{i.provider}</span>
-          {i.account_name && <Badge variant="accent">{i.account_name}</Badge>}
-          <span className="text-xs text-muted-foreground">
-            connected {new Date(i.created_at).toLocaleDateString()}
-          </span>
-        </div>
-        <ConfirmDialog
-          trigger={
-            <Button variant="ghost" size="sm">
-              <Trash2 className="size-4" />
-              Disconnect
-            </Button>
-          }
-          title={`Disconnect ${i.provider}?`}
-          description={i.account_name || undefined}
-          confirmLabel="Disconnect"
-          destructive
-          loading={disconnectPending}
-          onConfirm={onDisconnect}
-        />
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-border p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium capitalize">{i.provider}</span>
+        {i.account_name && <Badge variant="accent">{i.account_name}</Badge>}
+        <span className="text-xs text-muted-foreground">
+          connected {new Date(i.created_at).toLocaleDateString()}
+        </span>
       </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Webhook URL">
-          <div className="flex items-center gap-1">
-            <code className="flex-1 truncate rounded-md bg-foreground/5 px-2 py-1 text-xs">
-              {url}
-            </code>
-            <CopyButton value={url} />
-          </div>
-        </Field>
-        <Field label="Webhook secret">
-          <SecretValue value={i.hook_secret ?? ""} />
-        </Field>
-      </div>
-
-      {i.provider === "bitbucket" && (
-        <form
-          onSubmit={submitHook}
-          className="flex flex-col gap-2 border-t border-border pt-3"
-        >
-          <span className="text-sm font-medium">Workspace hook</span>
-          <div className="flex gap-2">
-            <Input
-              value={workspace}
-              onChange={(e) => setWorkspace(e.target.value)}
-              placeholder="workspace-slug"
-              className="h-9"
-            />
-            <Button type="submit" size="sm" loading={createHook.isPending}>
-              Create
-            </Button>
-          </div>
-          {createHook.isSuccess && (
-            <p className="text-xs text-success">
-              Created hook {createHook.data.hook_uuid}
-            </p>
-          )}
-          {createHook.isError && (
-            <p className="text-xs text-destructive">{createHook.error.message}</p>
-          )}
-        </form>
-      )}
+      <ConfirmDialog
+        trigger={
+          <Button variant="ghost" size="sm">
+            <Trash2 className="size-4" />
+            Disconnect
+          </Button>
+        }
+        title={`Disconnect ${i.provider}?`}
+        description={i.account_name || undefined}
+        confirmLabel="Disconnect"
+        destructive
+        loading={disconnectPending}
+        onConfirm={onDisconnect}
+      />
     </div>
   )
 }

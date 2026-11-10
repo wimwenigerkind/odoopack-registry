@@ -467,12 +467,6 @@ func (h *AuthHandler) completeIntegration(c *gin.Context, providerName, code str
 		}
 	}
 
-	hookSecret, err := generateSecret(32)
-	if err != nil {
-		internalError(c, "generate hook secret", err)
-		return
-	}
-
 	it := &models.OAuthIntegration{
 		Provider:     providerName,
 		OwnerID:      userID,
@@ -480,7 +474,6 @@ func (h *AuthHandler) completeIntegration(c *gin.Context, providerName, code str
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ExpiresAt:    expiresAt,
-		HookSecret:   hookSecret,
 	}
 	if err := h.integrations.Create(it); err != nil {
 		internalError(c, "save integration", err)

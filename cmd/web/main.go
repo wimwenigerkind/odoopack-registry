@@ -89,8 +89,8 @@ func main() {
 	groupHandler := handler.NewGroupHandler(groupRepo)
 	userHandler := handler.NewUserHandler(userRepo)
 	tokenHandler := handler.NewTokenHandler(tokenRepo)
-	integrationHandler := handler.NewIntegrationHandler(authRegistry, stateStore, integrationRepo, viper.GetBool("auth.cookie_secure"), baseURL)
-	webhookHandler := handler.NewWebhookHandler(integrationRepo, addonRepo, queue)
+	integrationHandler := handler.NewIntegrationHandler(authRegistry, stateStore, integrationRepo, viper.GetBool("auth.cookie_secure"))
+	webhookHandler := handler.NewWebhookHandler(addonRepo, tokenRepo, queue)
 
 	r := gin.Default()
 
@@ -179,7 +179,6 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, re
 
 		api.GET("/me/integrations", requireAuth, integrations.List)
 		api.DELETE("/me/integrations/:id", requireAuth, integrations.Delete)
-		api.POST("/me/integrations/:id/workspace-hooks", requireAuth, integrations.CreateWorkspaceHook)
 	}
 
 	if mode == "private" {
@@ -216,5 +215,5 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, re
 	r.GET("/integrations/providers", requireAuth, integrations.ListProviders)
 	r.GET("/integrations/:provider/connect", requireAuth, integrations.Connect)
 
-	r.POST("/webhooks/bitbucket/:integration_id", webhooks.Bitbucket)
+	r.POST("/webhooks/forgejo", webhooks.Forgejo)
 }

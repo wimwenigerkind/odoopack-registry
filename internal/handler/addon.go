@@ -2,8 +2,6 @@ package handler
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"sort"
@@ -419,12 +417,4 @@ func (h *AddonHandler) Readme(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, readme)
-}
-
-func generateSecret(n int) (string, error) {
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
 }
