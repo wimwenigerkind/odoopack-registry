@@ -21,10 +21,11 @@ import {
   CardTitle,
   CardDescription,
   ConfirmDialog,
+  CopyButton,
   EmptyState,
   Field,
   Input,
-  SecretValue,
+  Select,
   Spinner,
   Table,
   TBody,
@@ -49,7 +50,7 @@ import {
 } from "@/hooks/tokens/use-tokens"
 import { BACKEND_BASE } from "@/lib/api"
 import { cn } from "@/lib/cn"
-import type { OAuthIntegration } from "@/lib/types"
+import type { CreatedApiToken, OAuthIntegration } from "@/lib/types"
 
 type Identity = { id: string; provider: string; created_at: string }
 
@@ -293,13 +294,23 @@ function TokensCard() {
   const createToken = useCreateToken()
   const deleteToken = useDeleteToken()
   const [name, setName] = useState("")
+  const [expiresInDays, setExpiresInDays] = useState("")
+  const [created, setCreated] = useState<CreatedApiToken | null>(null)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
     createToken.mutate(
-      { name: name.trim() },
-      { onSuccess: () => setName("") },
+      {
+        name: name.trim(),
+        expires_in_days: expiresInDays ? Number(expiresInDays) : undefined,
+      },
+      {
+        onSuccess: (token) => {
+          setName("")
+          setCreated(token)
+        },
+      },
     )
   }
 
@@ -328,6 +339,18 @@ function TokensCard() {
               />
             </Field>
           </div>
+          <Field label="Expires" htmlFor="token-expiry">
+            <Select
+              id="token-expiry"
+              value={expiresInDays}
+              onChange={(e) => setExpiresInDays(e.target.value)}
+            >
+              <option value="">Never</option>
+              <option value="30">In 30 days</option>
+              <option value="90">In 90 days</option>
+              <option value="365">In 1 year</option>
+            </Select>
+          </Field>
           <Button type="submit" loading={createToken.isPending}>
             <Plus className="size-4" />
             Create
@@ -337,6 +360,24 @@ function TokensCard() {
           <p className="text-sm text-destructive">
             Error: {createToken.error.message}
           </p>
+        )}
+        {created && (
+          <div className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/10 p-4">
+            <p className="text-sm font-medium">
+              Copy the token for {created.name} now. It will not be shown again.
+            </p>
+            <div className="flex items-center gap-1">
+              <code className="flex-1 truncate rounded-md bg-foreground/5 px-2 py-1 text-xs">
+                {created.token}
+              </code>
+              <CopyButton value={created.token} />
+            </div>
+            <div>
+              <Button variant="ghost" size="sm" onClick={() => setCreated(null)}>
+                Done
+              </Button>
+            </div>
+          </div>
         )}
 
         {isLoading ? (
@@ -354,6 +395,7 @@ function TokensCard() {
                 <TH>Name</TH>
                 <TH>Token</TH>
                 <TH>Created</TH>
+                <TH>Expires</TH>
                 <TH>Last used</TH>
                 <TH></TH>
               </TR>
@@ -363,10 +405,15 @@ function TokensCard() {
                 <TR key={t.id}>
                   <TD className="font-medium">{t.name}</TD>
                   <TD>
-                    <SecretValue value={t.token} />
+                    <code className="rounded-md bg-foreground/5 px-2 py-1 text-xs">
+                      {t.prefix}...{t.last_four}
+                    </code>
                   </TD>
                   <TD className="text-muted-foreground">
                     {new Date(t.created_at).toLocaleDateString()}
+                  </TD>
+                  <TD className="text-muted-foreground">
+                    <TokenExpiry expiresAt={t.expires_at} />
                   </TD>
                   <TD className="text-muted-foreground">
                     {t.last_used_at
@@ -399,6 +446,14 @@ function TokensCard() {
       </CardContent>
     </Card>
   )
+}
+
+function TokenExpiry({ expiresAt }: { expiresAt?: string | null }) {
+  const [now] = useState(() => Date.now())
+  if (!expiresAt) return "never"
+  const date = new Date(expiresAt)
+  if (date.getTime() <= now) return <Badge variant="danger">expired</Badge>
+  return date.toLocaleDateString()
 }
 
 function IntegrationsCard() {

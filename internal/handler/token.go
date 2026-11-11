@@ -1,13 +1,13 @@
 package handler
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/wimwenigerkind/odoopack-registry/internal/apitoken"
 	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
@@ -21,8 +21,33 @@ func NewTokenHandler(tokens *repository.ApiTokenRepository) *TokenHandler {
 	return &TokenHandler{tokens: tokens}
 }
 
+// createTokenRequest takes an optional lifetime in whole days; zero or absent
+// means the token never expires.
 type createTokenRequest struct {
-	Name string `json:"name" binding:"required"`
+	Name          string `json:"name" binding:"required"`
+	ExpiresInDays int    `json:"expires_in_days" binding:"omitempty,min=1,max=3650"`
+}
+
+// createTokenResponse is the only response that carries the plain token.
+type createTokenResponse struct {
+	models.ApiToken
+	Token string `json:"token"`
+}
+
+func newApiToken(userID uuid.UUID, req createTokenRequest, plain string, now time.Time) models.ApiToken {
+	prefix, lastFour := apitoken.DisplayParts(plain)
+	tok := models.ApiToken{
+		UserID:    userID,
+		Name:      req.Name,
+		TokenHash: apitoken.Hash(plain),
+		Prefix:    prefix,
+		LastFour:  lastFour,
+	}
+	if req.ExpiresInDays > 0 {
+		expiresAt := now.AddDate(0, 0, req.ExpiresInDays)
+		tok.ExpiresAt = &expiresAt
+	}
+	return tok
 }
 
 func (h *TokenHandler) Create(c *gin.Context) {
@@ -37,22 +62,18 @@ func (h *TokenHandler) Create(c *gin.Context) {
 		return
 	}
 
-	plain, err := generateToken()
+	plain, err := apitoken.Generate()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
 
-	tok := &models.ApiToken{
-		UserID: userID,
-		Name:   req.Name,
-		Token:  plain,
-	}
-	if err := h.tokens.Create(tok); err != nil {
+	tok := newApiToken(userID, req, plain, time.Now())
+	if err := h.tokens.Create(&tok); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
-	c.JSON(http.StatusCreated, tok)
+	c.JSON(http.StatusCreated, createTokenResponse{ApiToken: tok, Token: plain})
 }
 
 func (h *TokenHandler) List(c *gin.Context) {
@@ -89,12 +110,4 @@ func (h *TokenHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
-}
-
-func generateToken() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return "odp_" + hex.EncodeToString(b), nil
 }

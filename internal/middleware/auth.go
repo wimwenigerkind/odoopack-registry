@@ -7,7 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/wimwenigerkind/odoopack-registry/internal/apitoken"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
+	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 )
 
@@ -57,20 +59,26 @@ func OptionalAuth(sessions auth.SessionStore) gin.HandlerFunc {
 	}
 }
 
-func ApiKeyOptional(tokens *repository.ApiTokenRepository) gin.HandlerFunc {
+// TokenStore is the part of the token repository that bearer authentication needs.
+type TokenStore interface {
+	GetByHash(hash string) (*models.ApiToken, error)
+	TouchLastUsed(id uuid.UUID, now time.Time) error
+}
+
+func ApiKeyOptional(tokens TokenStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if _, exists := c.Get(contextKeyUserID); exists {
 			c.Next()
 			return
 		}
-		if userID, ok := loadBearer(c, tokens); ok {
+		if userID, ok := BearerUserID(c, tokens, time.Now()); ok {
 			c.Set(contextKeyUserID, userID)
 		}
 		c.Next()
 	}
 }
 
-func loadBearer(c *gin.Context, tokens *repository.ApiTokenRepository) (uuid.UUID, bool) {
+func BearerUserID(c *gin.Context, tokens TokenStore, now time.Time) (uuid.UUID, bool) {
 	if tokens == nil {
 		return uuid.Nil, false
 	}
@@ -83,11 +91,11 @@ func loadBearer(c *gin.Context, tokens *repository.ApiTokenRepository) (uuid.UUI
 	if plain == "" {
 		return uuid.Nil, false
 	}
-	tok, err := tokens.GetByToken(plain)
-	if err != nil || tok == nil {
+	tok, err := tokens.GetByHash(apitoken.Hash(plain))
+	if err != nil || tok == nil || apitoken.Expired(tok.ExpiresAt, now) {
 		return uuid.Nil, false
 	}
-	_ = tokens.TouchLastUsed(tok.ID, time.Now())
+	_ = tokens.TouchLastUsed(tok.ID, now)
 	return tok.UserID, true
 }
 

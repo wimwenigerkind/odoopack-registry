@@ -5,11 +5,10 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 	"github.com/wimwenigerkind/odoopack-registry/internal/worker"
@@ -32,7 +31,7 @@ type forgejoPushPayload struct {
 }
 
 func (h *WebhookHandler) Forgejo(c *gin.Context) {
-	ownerID, ok := bearerOwner(c, h.tokens)
+	ownerID, ok := middleware.BearerUserID(c, h.tokens, time.Now())
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or missing api token"})
 		return
@@ -97,22 +96,4 @@ func (h *WebhookHandler) enqueueSyncs(addons []models.Addon) int {
 		queued++
 	}
 	return queued
-}
-
-func bearerOwner(c *gin.Context, tokens *repository.ApiTokenRepository) (uuid.UUID, bool) {
-	const prefix = "Bearer "
-	header := c.GetHeader("Authorization")
-	if !strings.HasPrefix(header, prefix) {
-		return uuid.Nil, false
-	}
-	plain := strings.TrimSpace(header[len(prefix):])
-	if plain == "" {
-		return uuid.Nil, false
-	}
-	tok, err := tokens.GetByToken(plain)
-	if err != nil || tok == nil {
-		return uuid.Nil, false
-	}
-	_ = tokens.TouchLastUsed(tok.ID, time.Now())
-	return tok.UserID, true
 }

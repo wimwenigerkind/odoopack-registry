@@ -1,7 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useApiClient } from "@/lib/api"
 import { queryKeys } from "@/lib/query-keys"
-import type { ApiToken, CreateTokenRequest } from "@/lib/types"
+import type {
+  ApiToken,
+  CreateTokenRequest,
+  CreatedApiToken,
+} from "@/lib/types"
 
 export function useTokens() {
   const api = useApiClient()
@@ -14,10 +18,10 @@ export function useTokens() {
 export function useCreateToken() {
   const api = useApiClient()
   const qc = useQueryClient()
-  return useMutation<ApiToken, Error, CreateTokenRequest>({
+  return useMutation<CreatedApiToken, Error, CreateTokenRequest>({
     meta: { successMessage: "Token created" },
     mutationFn: (req) =>
-      api<ApiToken>("/api/v1/me/tokens", {
+      api<CreatedApiToken>("/api/v1/me/tokens", {
         method: "POST",
         body: JSON.stringify(req),
       }),

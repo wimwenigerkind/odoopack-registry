@@ -17,7 +17,6 @@ func NewApiTokenRepository(db *gorm.DB) *ApiTokenRepository {
 	return &ApiTokenRepository{db: db}
 }
 
-// Create FIXME: encrypt token before storing
 func (r *ApiTokenRepository) Create(token *models.ApiToken) error {
 	return r.db.Create(token).Error
 }
@@ -28,9 +27,9 @@ func (r *ApiTokenRepository) ListByUser(userID uuid.UUID) ([]models.ApiToken, er
 	return tokens, err
 }
 
-func (r *ApiTokenRepository) GetByToken(plain string) (*models.ApiToken, error) {
+func (r *ApiTokenRepository) GetByHash(hash string) (*models.ApiToken, error) {
 	var token models.ApiToken
-	err := r.db.Where("token = ?", plain).First(&token).Error
+	err := r.db.Where("token_hash = ?", hash).First(&token).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
 	}

@@ -42,12 +42,20 @@ export interface ApiToken {
   updated_at: string
   user_id: string
   name: string
-  token: string
+  prefix: string
+  last_four: string
+  expires_at?: string | null
   last_used_at?: string | null
+}
+
+// Only the create response carries the plain token.
+export interface CreatedApiToken extends ApiToken {
+  token: string
 }
 
 export interface CreateTokenRequest {
   name: string
+  expires_in_days?: number
 }
 
 export interface OAuthIntegration {

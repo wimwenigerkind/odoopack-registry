@@ -22,6 +22,10 @@ func Migrate(db *gorm.DB) error {
 		return fmt.Errorf("database connection not established")
 	}
 
+	if err := hashLegacyApiTokens(db); err != nil {
+		return fmt.Errorf("failed to hash legacy api tokens: %w", err)
+	}
+
 	err := db.AutoMigrate(
 		&models.User{},
 		&models.Identity{},
