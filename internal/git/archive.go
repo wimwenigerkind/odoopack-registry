@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	odoomanifest "github.com/wimwenigerkind/odoo-manifest"
@@ -79,8 +80,8 @@ func CloneAndZip(url, ref, rootDir, subpath string) (ArchiveResult, error) {
 		ZipPath:     outName,
 		ContentHash: hash,
 		SizeBytes:   info.Size(),
-		Readme:      readReadme(src, subpath),
-		Manifest:    readManifest(src, subpath),
+		Readme:      readReadme(src, ref, subpath),
+		Manifest:    readManifest(src, ref, subpath),
 	}, nil
 }
 
@@ -150,53 +151,81 @@ func CloneAndZipAtSHA(url, sha, rootDir, subpath string) (ArchiveResult, error) 
 		ZipPath:     outName,
 		ContentHash: hash,
 		SizeBytes:   info.Size(),
-		Readme:      readReadme(src, subpath),
-		Manifest:    readManifest(src, subpath),
+		Readme:      readReadme(src, sha, subpath),
+		Manifest:    readManifest(src, sha, subpath),
 	}, nil
 }
 
-func readReadme(srcDir, subpath string) string {
-	dir := srcDir
-	if cleaned := strings.Trim(subpath, "/"); cleaned != "" {
-		dir = filepath.Join(srcDir, cleaned)
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return ""
-	}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		if strings.EqualFold(e.Name(), "README.md") {
-			data, err := os.ReadFile(filepath.Join(dir, e.Name()))
-			if err != nil {
-				return ""
-			}
-			return string(data)
-		}
-	}
-	return ""
+// maxMetadataBytes caps the README and manifest read from a repository; a
+// larger file is dropped rather than truncated.
+const maxMetadataBytes = 1 << 20
+
+func readReadme(srcDir, commitish, subpath string) string {
+	data := readBlob(srcDir, commitish, subpath, func(name string) bool {
+		return strings.EqualFold(name, "README.md")
+	})
+	return string(data)
 }
 
-func readManifest(srcDir, subpath string) *odoomanifest.Manifest {
-	dir := srcDir
-	if cleaned := strings.Trim(subpath, "/"); cleaned != "" {
-		dir = filepath.Join(srcDir, cleaned)
-	}
-	data, err := os.ReadFile(filepath.Join(dir, "__manifest__.py"))
-	if err != nil {
+func readManifest(srcDir, commitish, subpath string) *odoomanifest.Manifest {
+	data := readBlob(srcDir, commitish, subpath, func(name string) bool {
+		return name == "__manifest__.py"
+	})
+	if data == nil {
 		return nil
 	}
 	m, err := odoomanifest.Parse(data)
 	if err != nil {
-		slog.Warn("parse manifest", "dir", dir, "err", err)
+		slog.Warn("parse manifest", "commit", commitish, "subpath", subpath, "err", err)
 		return nil
 	}
 	return &m
 }
 
+// readBlob returns the first regular file in the tree at commitish:subpath
+// whose name matches. It reads from the object database instead of the
+// worktree so that a symlink in the repository can never point the reader
+// at a file outside of it; symlink entries (mode 120000) count as absent.
+func readBlob(srcDir, commitish, subpath string, match func(name string) bool) []byte {
+	treeish := commitish
+	if cleaned := strings.Trim(subpath, "/"); cleaned != "" {
+		treeish = commitish + ":" + cleaned
+	}
+	out, err := outputGit(srcDir, "ls-tree", "-z", "--long", treeish)
+	if err != nil {
+		return nil
+	}
+	for _, entry := range strings.Split(string(out), "\x00") {
+		meta, name, ok := strings.Cut(entry, "\t")
+		if !ok || !match(name) {
+			continue
+		}
+		fields := strings.Fields(meta)
+		if len(fields) != 4 || fields[1] != "blob" {
+			continue
+		}
+		if fields[0] != "100644" && fields[0] != "100755" {
+			continue
+		}
+		size, err := strconv.ParseInt(fields[3], 10, 64)
+		if err != nil || size > maxMetadataBytes {
+			return nil
+		}
+		data, err := outputGit(srcDir, "cat-file", "blob", fields[2])
+		if err != nil {
+			return nil
+		}
+		return data
+	}
+	return nil
+}
+
 func runGit(workdir string, args ...string) error {
+	_, err := outputGit(workdir, args...)
+	return err
+}
+
+func outputGit(workdir string, args ...string) ([]byte, error) {
 	cmd := exec.Command("git", args...)
 	if workdir != "" {
 		cmd.Dir = workdir
@@ -207,10 +236,11 @@ func runGit(workdir string, args ...string) error {
 	)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
 	}
-	return nil
+	return out, nil
 }
 
 func sha256File(path string) (string, error) {
