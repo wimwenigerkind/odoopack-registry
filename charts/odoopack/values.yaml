@@ -102,10 +102,11 @@ config:
       use_path_style: false
       prefix: ""
       presign_ttl: 5m
+  # The web pods refuse the memory store unless dev_mode is true; redis needs
+  # REDIS_URL in secrets or existingSecret.
   session:
-    store: memory
-  auth:
-    cookie_secure: true
+    store: redis
+  # auth.cookie_secure follows the scheme of base_url unless set explicitly.
   log:
     level: info
 

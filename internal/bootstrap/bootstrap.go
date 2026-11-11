@@ -36,24 +36,43 @@ func Storage() (storage.Storage, error) {
 	}
 }
 
+// sessionStore reads session.store and refuses the memory store outside
+// dev_mode: it loses every session on a restart, and with more than one
+// replica neither sessions nor login states reach the pod that needs them.
+func sessionStore() (string, error) {
+	kind := viper.GetString("session.store")
+	if (kind == "" || kind == "memory") && !viper.GetBool("dev_mode") {
+		return "", fmt.Errorf("session.store %q is for local development only: use %q, or set dev_mode to true", kind, "redis")
+	}
+	return kind, nil
+}
+
 func SessionStore() (auth.SessionStore, error) {
-	switch viper.GetString("session.store") {
+	kind, err := sessionStore()
+	if err != nil {
+		return nil, err
+	}
+	switch kind {
 	case "", "memory":
 		return auth.NewMemorySessionStore(), nil
 	case "redis":
 		return auth.NewRedisSessionStore(viper.GetString("redis.url"))
 	default:
-		return nil, fmt.Errorf("unsupported session store %q", viper.GetString("session.store"))
+		return nil, fmt.Errorf("unsupported session store %q", kind)
 	}
 }
 
 func StateStore() (auth.StateStore, error) {
-	switch viper.GetString("session.store") {
+	kind, err := sessionStore()
+	if err != nil {
+		return nil, err
+	}
+	switch kind {
 	case "", "memory":
 		return auth.NewMemoryStateStore(), nil
 	case "redis":
 		return auth.NewRedisStateStore(viper.GetString("redis.url"))
 	default:
-		return nil, fmt.Errorf("unsupported session store %q", viper.GetString("session.store"))
+		return nil, fmt.Errorf("unsupported session store %q", kind)
 	}
 }

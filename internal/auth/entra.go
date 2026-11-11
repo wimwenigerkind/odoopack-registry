@@ -35,7 +35,7 @@ func NewEntraProvider(ctx context.Context, name string, cfg EntraConfig, redirec
 		tenant = "common"
 	}
 	issuer := "https://login.microsoftonline.com/" + tenant + "/v2.0"
-	provider, err := oidc.NewProvider(ctx, issuer)
+	provider, err := oidc.NewProvider(withHTTPClient(ctx), issuer)
 	if err != nil {
 		return nil, fmt.Errorf("entra discovery: %w", err)
 	}
@@ -72,7 +72,7 @@ func (p *EntraProvider) LoginAuthURL(state, nonce, pkceVerifier string) string {
 }
 
 func (p *EntraProvider) ExchangeLogin(ctx context.Context, code, pkceVerifier, expectedNonce string) (LoginResult, error) {
-	token, err := p.oauth2.Exchange(ctx, code, oauth2.VerifierOption(pkceVerifier))
+	token, err := p.oauth2.Exchange(withHTTPClient(ctx), code, oauth2.VerifierOption(pkceVerifier))
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("token exchange: %w", err)
 	}

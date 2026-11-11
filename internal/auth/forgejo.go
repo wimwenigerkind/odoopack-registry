@@ -85,7 +85,7 @@ func (p *ForgejoProvider) LoginAuthURL(state, _, _ string) string {
 }
 
 func (p *ForgejoProvider) ExchangeLogin(ctx context.Context, code, _, _ string) (LoginResult, error) {
-	token, err := p.loginOAuth.Exchange(ctx, code)
+	token, err := p.loginOAuth.Exchange(withHTTPClient(ctx), code)
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("forgejo token exchange: %w", err)
 	}
@@ -108,7 +108,7 @@ func (p *ForgejoProvider) IntegrationAuthURL(state string) string {
 }
 
 func (p *ForgejoProvider) ExchangeIntegration(ctx context.Context, code string) (accessToken, refreshToken string, expiresAt *time.Time, err error) {
-	token, err := p.integOAuth.Exchange(ctx, code)
+	token, err := p.integOAuth.Exchange(withHTTPClient(ctx), code)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("forgejo integration exchange: %w", err)
 	}
@@ -116,7 +116,7 @@ func (p *ForgejoProvider) ExchangeIntegration(ctx context.Context, code string) 
 }
 
 func (p *ForgejoProvider) RefreshIntegration(ctx context.Context, refresh string) (accessToken, newRefresh string, expiresAt *time.Time, err error) {
-	token, err := p.integOAuth.TokenSource(ctx, &oauth2.Token{RefreshToken: refresh}).Token()
+	token, err := p.integOAuth.TokenSource(withHTTPClient(ctx), &oauth2.Token{RefreshToken: refresh}).Token()
 	if err != nil {
 		return "", "", nil, fmt.Errorf("forgejo integration refresh: %w", err)
 	}
@@ -157,7 +157,7 @@ func (p *ForgejoProvider) fetchUser(ctx context.Context, token string) (*forgejo
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, p.apiBase+"/user", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("forgejo user: %w", err)
 	}
@@ -186,7 +186,7 @@ func (p *ForgejoProvider) fetchPrimaryEmail(ctx context.Context, token string) (
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, p.apiBase+"/user/emails", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", false, fmt.Errorf("forgejo emails: %w", err)
 	}

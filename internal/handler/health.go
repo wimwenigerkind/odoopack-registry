@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -25,26 +26,23 @@ func (h *HealthHandler) Live(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
+// Ready answers with a bare status: /readyz is reachable through the ingress,
+// and a check error can name hosts, users or database details.
 func (h *HealthHandler) Ready(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 	defer cancel()
 
-	results := make(map[string]string, len(h.checks))
 	ready := true
 	for _, check := range h.checks {
 		if err := check.Fn(ctx); err != nil {
 			ready = false
-			results[check.Name] = "error: " + err.Error()
-		} else {
-			results[check.Name] = "ok"
+			slog.Warn("readiness check failed", "check", check.Name, "err", err)
 		}
 	}
 
-	status := http.StatusOK
-	overall := "ok"
 	if !ready {
-		status = http.StatusServiceUnavailable
-		overall = "unavailable"
+		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable"})
+		return
 	}
-	c.JSON(status, gin.H{"status": overall, "checks": results})
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

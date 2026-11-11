@@ -29,7 +29,7 @@ type OidcProvider struct {
 }
 
 func NewOIDCProvider(ctx context.Context, name string, cfg OIDCConfig, redirectURL string) (*OidcProvider, error) {
-	provider, err := oidc.NewProvider(ctx, cfg.IssuerURL)
+	provider, err := oidc.NewProvider(withHTTPClient(ctx), cfg.IssuerURL)
 	if err != nil {
 		return nil, fmt.Errorf("oidc discovery: %w", err)
 	}
@@ -66,7 +66,7 @@ func (p *OidcProvider) LoginAuthURL(state, nonce, pkceVerifier string) string {
 }
 
 func (p *OidcProvider) ExchangeLogin(ctx context.Context, code, pkceVerifier, expectedNonce string) (LoginResult, error) {
-	token, err := p.oauth2.Exchange(ctx, code, oauth2.VerifierOption(pkceVerifier))
+	token, err := p.oauth2.Exchange(withHTTPClient(ctx), code, oauth2.VerifierOption(pkceVerifier))
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("token exchange: %w", err)
 	}

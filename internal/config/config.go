@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -34,6 +35,9 @@ func LoadConfig() {
 	viper.SetDefault("storage.s3.presign_ttl", "5m")
 
 	viper.SetDefault("session.store", "memory") // "memory" or "redis"
+	// dev_mode allows what only a single local process gets away with, such
+	// as the memory session store.
+	viper.SetDefault("dev_mode", false)
 	viper.SetDefault("redis.url", "redis://localhost:6379/0")
 
 	viper.SetDefault("auto_migrate", true)
@@ -60,4 +64,19 @@ func ValidateInstanceMode(mode string) error {
 		return nil
 	}
 	return fmt.Errorf("instance.mode must be %q or %q, got %q", "public", "private", mode)
+}
+
+// CookieSecure decides the Secure flag of the session and state cookies.
+// Unset, it follows the scheme of baseURL, so an https deployment cannot ship
+// cookies a plain http hop would leak. insecure reports an explicit false on an
+// https baseURL, which the caller should warn about.
+func CookieSecure(baseURL string, explicit *bool) (secure, insecure bool) {
+	https := false
+	if u, err := url.Parse(baseURL); err == nil {
+		https = u.Scheme == "https"
+	}
+	if explicit == nil {
+		return https, false
+	}
+	return *explicit, https && !*explicit
 }

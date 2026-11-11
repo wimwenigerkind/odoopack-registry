@@ -15,14 +15,15 @@ helm install odoopack oci://ghcr.io/wimwenigerkind/charts/odoopack \
   --set config.storage.s3.bucket=odoopack \
   --set config.storage.s3.access_key_id=KEY \
   --set secrets.DATABASE_DSN='host=postgres port=5432 user=odoopack password=... dbname=odoopack sslmode=disable' \
-  --set secrets.STORAGE_S3_SECRET_ACCESS_KEY=SECRET
+  --set secrets.STORAGE_S3_SECRET_ACCESS_KEY=SECRET \
+  --set secrets.REDIS_URL=redis://redis:6379/0
 ```
 
 ## Prerequisites
 
 - An external PostgreSQL database (pass its DSN via `secrets.DATABASE_DSN` or `existingSecret`).
 - S3-compatible object storage, shared by the web and worker pods.
-- Optional external Redis when `config.session.store` is `redis`.
+- An external Redis for sessions and login state (pass its URL via `secrets.REDIS_URL` or `existingSecret`). The `memory` store is for local development only and the web pods refuse it unless `dev_mode` is `true`.
 
 ## Configuration
 
@@ -43,8 +44,8 @@ Non-secret settings live under `config` and are rendered into a `config.yaml` th
 | `config.instance.mode` | `public` | `public` or `private` |
 | `config.storage.driver` | `s3` | Storage driver |
 | `config.storage.s3.*` | | S3 endpoint, region, bucket, access_key_id, flags |
-| `config.session.store` | `memory` | `memory` or `redis` |
-| `config.auth.cookie_secure` | `true` | Secure session cookies |
+| `config.session.store` | `redis` | `redis`, or `memory` together with `dev_mode: true` |
+| `config.auth.cookie_secure` | unset | Secure session cookies; unset, true when `base_url` is https |
 | `extraConfig` | `{}` | Deep-merged over `config`, use for auth providers |
 | `secrets` | `{}` | Secret env vars rendered into a Secret |
 | `existingSecret` | `""` | Use a pre-existing Secret instead of `secrets` |
@@ -58,7 +59,7 @@ Non-secret settings live under `config` and are rendered into a `config.yaml` th
 
 - `DATABASE_DSN`
 - `STORAGE_S3_SECRET_ACCESS_KEY`
-- `REDIS_URL` (when using Redis)
+- `REDIS_URL`
 - `AUTH_<PROVIDER>_CLIENT_SECRET` (per configured auth provider)
 
 ### Auth providers

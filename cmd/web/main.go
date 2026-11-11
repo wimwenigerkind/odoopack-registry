@@ -26,6 +26,16 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/worker"
 )
 
+// The write timeout runs from the end of the request headers to the end of the
+// response, so it has to cover an on-demand rebuild of a zipball (up to two
+// minutes, see RegistryHandler.Zipball) plus streaming the archive.
+const (
+	readHeaderTimeout = 10 * time.Second
+	readTimeout       = 30 * time.Second
+	writeTimeout      = 5 * time.Minute
+	idleTimeout       = 2 * time.Minute
+)
+
 func main() {
 	config.LoadConfig()
 	logger.Setup(viper.GetString("log.level"))
@@ -89,16 +99,28 @@ func main() {
 	downloadHandler := handler.NewDownloadHandler(addonRepo, versionRepo, groupRepo, userRepo, store, mode)
 	triggerHandler := handler.NewTriggerHandler(addonRepo, userRepo, queue)
 	registryHandler := handler.NewRegistryHandler(addonRepo, groupRepo, userRepo, integrationRepo, authRegistry, store, mode, baseURL)
-	authHandler := handler.NewAuthHandler(authRegistry, stateStore, sessionStore, userRepo, groupRepo, integrationRepo, viper.GetBool("auth.cookie_secure"))
+	var explicitSecure *bool
+	if viper.IsSet("auth.cookie_secure") {
+		v := viper.GetBool("auth.cookie_secure")
+		explicitSecure = &v
+	}
+	cookieSecure, insecure := config.CookieSecure(baseURL, explicitSecure)
+	if insecure {
+		slog.Warn("auth.cookie_secure is false although base_url is https: session cookies are sent over plain http too")
+	}
+	authHandler := handler.NewAuthHandler(authRegistry, stateStore, sessionStore, userRepo, groupRepo, integrationRepo, cookieSecure)
 	groupHandler := handler.NewGroupHandler(groupRepo)
 	userHandler := handler.NewUserHandler(userRepo)
 	tokenHandler := handler.NewTokenHandler(tokenRepo)
-	integrationHandler := handler.NewIntegrationHandler(authRegistry, stateStore, integrationRepo, viper.GetBool("auth.cookie_secure"))
+	integrationHandler := handler.NewIntegrationHandler(authRegistry, stateStore, integrationRepo, cookieSecure)
 	webhookHandler := handler.NewWebhookHandler(addonRepo, tokenRepo, queue)
 
-	r := gin.Default()
+	gin.SetMode(ginMode())
+	r := gin.New()
+	r.Use(middleware.RequestLogger(slog.Default()), gin.Recovery())
 
-	if origins := viper.GetStringSlice("cors.allowed_origins"); len(origins) > 0 {
+	origins := viper.GetStringSlice("cors.allowed_origins")
+	if len(origins) > 0 {
 		r.Use(cors.New(cors.Config{
 			AllowOrigins:     origins,
 			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -115,7 +137,8 @@ func main() {
 	requireAdmin := middleware.RequireAdmin(sessionStore, userRepo)
 	optionalAuth := middleware.OptionalAuth(sessionStore)
 	apiKeyOptional := middleware.ApiKeyOptional(tokenRepo)
-	registerRoutes(r, mode, addonHandler, repoHandler, downloadHandler, triggerHandler, registryHandler, authHandler, groupHandler, userHandler, tokenHandler, integrationHandler, webhookHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional)
+	sameOrigin := middleware.SameOrigin(append([]string{baseURL}, origins...))
+	registerRoutes(r, mode, addonHandler, repoHandler, downloadHandler, triggerHandler, registryHandler, authHandler, groupHandler, userHandler, tokenHandler, integrationHandler, webhookHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional, sameOrigin)
 
 	healthChecks := []handler.HealthCheck{
 		{Name: "database", Fn: func(ctx context.Context) error {
@@ -134,7 +157,14 @@ func main() {
 	r.GET("/readyz", healthHandler.Ready)
 
 	addr := viper.GetString("server_address")
-	srv := &http.Server{Addr: addr, Handler: r}
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           r,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+	}
 
 	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -157,8 +187,8 @@ func main() {
 	}
 }
 
-func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, repos *handler.RepoHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, groups *handler.GroupHandler, users *handler.UserHandler, tokens *handler.TokenHandler, integrations *handler.IntegrationHandler, webhooks *handler.WebhookHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional gin.HandlerFunc) {
-	api := r.Group("/api/v1")
+func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, repos *handler.RepoHandler, downloads *handler.DownloadHandler, triggers *handler.TriggerHandler, registry *handler.RegistryHandler, authH *handler.AuthHandler, groups *handler.GroupHandler, users *handler.UserHandler, tokens *handler.TokenHandler, integrations *handler.IntegrationHandler, webhooks *handler.WebhookHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional, sameOrigin gin.HandlerFunc) {
+	api := r.Group("/api/v1", sameOrigin)
 	{
 		api.GET("/me", requireAuth, authH.Me)
 		api.GET("/addons", optionalAuth, addons.List)
@@ -213,11 +243,20 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, re
 		a.GET("/link", requireAuth, authH.Link)
 		a.GET("/callback", authH.Callback)
 	}
-	r.POST("/auth/logout", requireAuth, authH.Logout)
-	r.DELETE("/api/v1/me/identities/:id", requireAuth, authH.UnlinkIdentity)
+	r.POST("/auth/logout", sameOrigin, requireAuth, authH.Logout)
+	r.DELETE("/api/v1/me/identities/:id", sameOrigin, requireAuth, authH.UnlinkIdentity)
 
 	r.GET("/integrations/providers", requireAuth, integrations.ListProviders)
 	r.GET("/integrations/:provider/connect", requireAuth, integrations.Connect)
 
 	r.POST("/webhooks/forgejo", webhooks.Forgejo)
+}
+
+// ginMode defaults to release mode, whose recovery output leaves out the
+// request dump with its cookies; GIN_MODE still overrides it.
+func ginMode() string {
+	if m := os.Getenv(gin.EnvGinMode); m != "" {
+		return m
+	}
+	return gin.ReleaseMode
 }

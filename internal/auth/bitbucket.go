@@ -61,7 +61,7 @@ func (p *BitbucketProvider) LoginAuthURL(state, _, _ string) string {
 }
 
 func (p *BitbucketProvider) ExchangeLogin(ctx context.Context, code, _, _ string) (LoginResult, error) {
-	token, err := p.oauth2.Exchange(ctx, code)
+	token, err := p.oauth2.Exchange(withHTTPClient(ctx), code)
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("bitbucket token exchange: %w", err)
 	}
@@ -81,7 +81,7 @@ func (p *BitbucketProvider) IntegrationAuthURL(state string) string {
 }
 
 func (p *BitbucketProvider) ExchangeIntegration(ctx context.Context, code string) (accessToken, refreshToken string, expiresAt *time.Time, err error) {
-	token, err := p.oauth2.Exchange(ctx, code)
+	token, err := p.oauth2.Exchange(withHTTPClient(ctx), code)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("bitbucket integration exchange: %w", err)
 	}
@@ -89,7 +89,7 @@ func (p *BitbucketProvider) ExchangeIntegration(ctx context.Context, code string
 }
 
 func (p *BitbucketProvider) RefreshIntegration(ctx context.Context, refresh string) (accessToken, newRefresh string, expiresAt *time.Time, err error) {
-	token, err := p.oauth2.TokenSource(ctx, &oauth2.Token{RefreshToken: refresh}).Token()
+	token, err := p.oauth2.TokenSource(withHTTPClient(ctx), &oauth2.Token{RefreshToken: refresh}).Token()
 	if err != nil {
 		return "", "", nil, fmt.Errorf("bitbucket integration refresh: %w", err)
 	}
@@ -135,7 +135,7 @@ func fetchBitbucketUser(ctx context.Context, token string) (*bbUser, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.bitbucket.org/2.0/user", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("bitbucket user: %w", err)
 	}
@@ -168,7 +168,7 @@ func fetchBitbucketPrimaryEmail(ctx context.Context, token string) (string, bool
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.bitbucket.org/2.0/user/emails", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", false, fmt.Errorf("bitbucket emails: %w", err)
 	}

@@ -65,7 +65,7 @@ func (p *GitHubProvider) LoginAuthURL(state, _, _ string) string {
 }
 
 func (p *GitHubProvider) ExchangeLogin(ctx context.Context, code, _, _ string) (LoginResult, error) {
-	token, err := p.loginOAuth.Exchange(ctx, code)
+	token, err := p.loginOAuth.Exchange(withHTTPClient(ctx), code)
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("github token exchange: %w", err)
 	}
@@ -85,7 +85,7 @@ func (p *GitHubProvider) IntegrationAuthURL(state string) string {
 }
 
 func (p *GitHubProvider) ExchangeIntegration(ctx context.Context, code string) (accessToken, refreshToken string, expiresAt *time.Time, err error) {
-	token, err := p.integOAuth.Exchange(ctx, code)
+	token, err := p.integOAuth.Exchange(withHTTPClient(ctx), code)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("github integration exchange: %w", err)
 	}
@@ -93,7 +93,7 @@ func (p *GitHubProvider) ExchangeIntegration(ctx context.Context, code string) (
 }
 
 func (p *GitHubProvider) RefreshIntegration(ctx context.Context, refresh string) (accessToken, newRefresh string, expiresAt *time.Time, err error) {
-	token, err := p.integOAuth.TokenSource(ctx, &oauth2.Token{RefreshToken: refresh}).Token()
+	token, err := p.integOAuth.TokenSource(withHTTPClient(ctx), &oauth2.Token{RefreshToken: refresh}).Token()
 	if err != nil {
 		return "", "", nil, fmt.Errorf("github integration refresh: %w", err)
 	}
@@ -136,7 +136,7 @@ func fetchGitHubUser(ctx context.Context, token string) (*ghUser, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/vnd.github+json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("github user: %w", err)
 	}
@@ -165,7 +165,7 @@ func fetchGitHubPrimaryEmail(ctx context.Context, token string) (string, bool, e
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user/emails", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/vnd.github+json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", false, fmt.Errorf("github emails: %w", err)
 	}
