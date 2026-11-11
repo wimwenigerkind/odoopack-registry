@@ -1,0 +1,8 @@
+version: "2"
+
+linters:
+  exclusions:
+    # npm packages may ship Go files (node_modules/flatted/golang) once the
+    # frontend is installed; they are not ours to lint.
+    paths:
+      - node_modules
