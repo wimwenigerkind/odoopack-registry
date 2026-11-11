@@ -3,7 +3,7 @@
 nameOverride: ""
 fullnameOverride: ""
 
-# Backend image, shared by the web, worker and migration workloads.
+# Backend image, shared by the web and worker workloads and the migrate init container.
 image:
   registry: ghcr.io
   repository: wimwenigerkind/odoopack-registry-backend
@@ -79,13 +79,13 @@ frontend:
     type: ClusterIP
     port: 80
 
-# Database migrations run once per release as a pre-upgrade Job.
-# When enabled the web pods skip auto-migration (AUTO_MIGRATE=false).
+# Database migrations run in the init container "migrate" of every web pod,
+# before the web container starts. Concurrent runs serialize on a Postgres
+# advisory lock, so the first pod migrates and the others find nothing to do.
+# Disable only when you run the migrate binary yourself before each upgrade.
 migration:
   enabled: true
-  backoffLimit: 3
   resources: {}
-  annotations: {}
 
 # Non-secret application config, rendered to config.yaml and read by viper.
 config:

@@ -40,7 +40,9 @@ func LoadConfig() {
 	viper.SetDefault("dev_mode", false)
 	viper.SetDefault("redis.url", "redis://localhost:6379/0")
 
-	viper.SetDefault("auto_migrate", true)
+	// Deployments run the migrate binary before the web pods start;
+	// auto_migrate is for local development.
+	viper.SetDefault("auto_migrate", false)
 
 	viper.SetDefault("worker.count", 2)
 	viper.SetDefault("worker.poll_interval", "2s")

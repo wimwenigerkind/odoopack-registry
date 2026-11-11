@@ -10,7 +10,7 @@ Components:
   frontend Deployment/{{ include "odoopack.fullname" . }}-frontend
 {{- end }}
 {{- if .Values.migration.enabled }}
-  migrate  Job (pre-install,pre-upgrade hook)
+  migrate  init container of the web pods
 {{- end }}
 
 {{- if .Values.ingress.enabled }}

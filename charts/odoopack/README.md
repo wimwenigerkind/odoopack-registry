@@ -1,6 +1,6 @@
 # odoopack Helm chart
 
-Deploys the odoopack registry: the web API, the background worker, the frontend, and a one-shot database migration Job.
+Deploys the odoopack registry: the web API, the background worker and the frontend. Database migrations run in an init container of the web pods.
 
 ## Install
 
@@ -40,7 +40,8 @@ Non-secret settings live under `config` and are rendered into a `config.yaml` th
 | `worker.replicaCount` | `1` | Worker replicas |
 | `worker.healthPort` | `6970` | Worker health endpoint port |
 | `worker.terminationGracePeriodSeconds` | `720` | Time a stopping worker gets to finish its running job; keep it above the 10 minute job timeout |
-| `migration.enabled` | `true` | Run migrations as a pre-upgrade Job; web skips auto-migrate |
+| `migration.enabled` | `true` | Run migrations in the `migrate` init container of the web pods |
+| `migration.resources` | `{}` | Resources of the `migrate` init container |
 | `config.base_url` | `http://localhost` | Public base URL, must be set |
 | `config.instance.mode` | `public` | `public` or `private` |
 | `config.storage.driver` | `s3` | Storage driver |
@@ -54,6 +55,16 @@ Non-secret settings live under `config` and are rendered into a `config.yaml` th
 | `extraEnvFrom` | `[]` | Extra envFrom sources |
 | `ingress.enabled` | `false` | Path-split ingress (API to web, rest to frontend) |
 
+### Database migrations
+
+Every web pod runs `migrate` (the same backend image, Secret and `config.yaml`) as an init container before the web container starts. Pods that start together, after a scale up or during a rolling update, serialize on a Postgres advisory lock: the first one migrates, the others wait and then find nothing left to do. The web container itself never migrates (`AUTO_MIGRATE=false`). This is deliberately not a Helm hook: a pre-install hook runs before the Secret and ConfigMap of the same release exist, so it cannot start on a fresh install.
+
+During a rolling update the old pods keep serving while a new pod migrates, so a release only adds to the schema in ways the previous release can live with.
+
+The worker does not migrate. Until a migration has created the schema it waits, checking with a backoff of up to 30 seconds, and starts taking jobs afterwards.
+
+Set `migration.enabled: false` only if you run `migrate` yourself, against the same database and with the same config and Secret, before every upgrade.
+
 ### Secret keys
 
 `secrets` (or `existingSecret`) provides sensitive values as environment variables, which override the config file:
@@ -64,7 +75,7 @@ Non-secret settings live under `config` and are rendered into a `config.yaml` th
 - `AUTH_<PROVIDER>_CLIENT_SECRET` (per configured auth provider)
 - `INTEGRATIONS_ENCRYPTION_KEY` (required once a provider sets `allow_git_integration`)
 
-The web, worker and migration pods all read these from the same Secret.
+The web and worker pods and the `migrate` init container all read these from the same Secret.
 
 ### Integration encryption key
 
@@ -79,7 +90,7 @@ secrets:
   INTEGRATIONS_ENCRYPTION_KEY: "..."
 ```
 
-As soon as any auth provider sets `allow_git_integration: true`, the web and worker pods refuse to start without a valid key. Without such a provider the key is optional. When the key is set, the migration Job encrypts tokens stored before encryption existed; running it again changes nothing. Pass the key on every `helm upgrade` (or keep it in `existingSecret`), because the rendered Secret is recreated from the values on each upgrade.
+As soon as any auth provider sets `allow_git_integration: true`, the web and worker pods refuse to start without a valid key. Without such a provider the key is optional. When the key is set, the `migrate` init container encrypts tokens stored before encryption existed; running it again changes nothing. Pass the key on every `helm upgrade` (or keep it in `existingSecret`), because the rendered Secret is recreated from the values on each upgrade.
 
 Losing or changing the key makes the stored tokens unreadable: builds of repos that clone through an integration fail until their owners connect the same account again in their profile, which overwrites the stored tokens and keeps the repos linked. Repos, addons and published versions stay as they are.
 

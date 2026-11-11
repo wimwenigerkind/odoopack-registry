@@ -56,6 +56,11 @@ func main() {
 		startHealthServer(ctx, addr, db)
 	}
 
+	if err := database.WaitForSchema(ctx, db); err != nil {
+		slog.Info("worker stopped before the database schema was ready")
+		return
+	}
+
 	consumer := worker.NewConsumer(db, versionRepo, integrationRepo, authRegistry, store, viper.GetDuration("worker.poll_interval"))
 	workers := viper.GetInt("worker.count")
 	slog.Info("starting worker", "workers", workers)

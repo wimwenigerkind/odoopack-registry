@@ -33,6 +33,40 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.migration.enabled }}
+      initContainers:
+        - name: migrate
+          image: {{ include "odoopack.backendImage" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["migrate"]
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if or (include "odoopack.hasSecret" .) .Values.extraEnvFrom }}
+          envFrom:
+            {{- if include "odoopack.hasSecret" . }}
+            - secretRef:
+                name: {{ include "odoopack.secretName" . }}
+            {{- end }}
+            {{- with .Values.extraEnvFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /data/config.yaml
+              subPath: config.yaml
+              readOnly: true
+          {{- with .Values.migration.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- end }}
       containers:
         - name: web
           image: {{ include "odoopack.backendImage" . | quote }}
@@ -46,7 +80,7 @@ spec:
             - name: SERVER_ADDRESS
               value: "0.0.0.0:{{ .Values.web.port }}"
             - name: AUTO_MIGRATE
-              value: {{ not .Values.migration.enabled | quote }}
+              value: "false"
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
