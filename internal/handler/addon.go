@@ -186,7 +186,7 @@ func (h *AddonHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := validate.GitURL(req.GitURL); err != nil {
+	if err := validate.GitURL(c.Request.Context(), req.GitURL); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

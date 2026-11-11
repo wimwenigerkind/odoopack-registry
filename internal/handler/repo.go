@@ -120,7 +120,7 @@ func (h *RepoHandler) Update(c *gin.Context) {
 
 	if req.GitURL != nil {
 		gitURL := strings.TrimSpace(*req.GitURL)
-		if err := validate.GitURL(gitURL); err != nil {
+		if err := validate.GitURL(c.Request.Context(), gitURL); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

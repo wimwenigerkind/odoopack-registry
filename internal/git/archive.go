@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"strings"
 
 	odoomanifest "github.com/wimwenigerkind/odoo-manifest"
+	"github.com/wimwenigerkind/odoopack-registry/internal/validate"
 )
 
 type ArchiveResult struct {
@@ -32,6 +34,9 @@ func CloneAndZip(url string, env []string, ref, rootDir, subpath string) (Archiv
 	defer func() { _ = os.RemoveAll(tmp) }()
 
 	src := filepath.Join(tmp, "src")
+	if err := checkRemote(url); err != nil {
+		return ArchiveResult{}, err
+	}
 	if err := runGit("", env, "clone", "--depth", "1", "--branch", ref, "--single-branch", url, src); err != nil {
 		return ArchiveResult{}, fmt.Errorf("git clone %s@%s: %w", url, ref, err)
 	}
@@ -102,7 +107,13 @@ func CloneAndZipAtSHA(url string, env []string, sha, rootDir, subpath string) (A
 	if err := runGit(src, nil, "remote", "add", "origin", url); err != nil {
 		return ArchiveResult{}, fmt.Errorf("git remote add: %w", err)
 	}
+	if err := checkRemote(url); err != nil {
+		return ArchiveResult{}, err
+	}
 	if err := runGit(src, env, "fetch", "--depth", "1", "origin", sha); err != nil {
+		if err := checkRemote(url); err != nil {
+			return ArchiveResult{}, err
+		}
 		if err := runGit(src, env, "fetch", "--tags", "origin"); err != nil {
 			return ArchiveResult{}, fmt.Errorf("git fetch %s: %w", sha, err)
 		}
@@ -225,8 +236,17 @@ func runGit(workdir string, env []string, args ...string) error {
 	return err
 }
 
-func outputGit(workdir string, env []string, args ...string) ([]byte, error) {
-	cmd := exec.Command("git", args...)
+// checkRemote runs right before every clone, fetch and ls-remote. git
+// resolves the name again on its own, so a DNS rebinding between this check
+// and git's connect still gets through; the egress NetworkPolicy of the
+// deployment is the second line against that.
+var checkRemote = func(url string) error {
+	return validate.GitHost(context.Background(), url)
+}
+
+func gitCommand(workdir string, env []string, args ...string) *exec.Cmd {
+	// A redirect would send git to a host that never passed checkRemote.
+	cmd := exec.Command("git", append([]string{"-c", "http.followRedirects=false"}, args...)...)
 	if workdir != "" {
 		cmd.Dir = workdir
 	}
@@ -235,6 +255,11 @@ func outputGit(workdir string, env []string, args ...string) ([]byte, error) {
 		"GIT_PROTOCOL_FROM_USER=0",
 	)
 	cmd.Env = append(cmd.Env, env...)
+	return cmd
+}
+
+func outputGit(workdir string, env []string, args ...string) ([]byte, error) {
+	cmd := gitCommand(workdir, env, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

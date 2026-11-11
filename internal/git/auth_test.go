@@ -19,6 +19,7 @@ func TestFailedCloneKeepsTokenOut(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
+	git.SkipRemoteCheck(t)
 
 	var mu sync.Mutex
 	var seen []string

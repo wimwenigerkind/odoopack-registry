@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 )
 
@@ -23,17 +21,12 @@ type Ref struct {
 }
 
 func LsRemote(url string, env []string) ([]Ref, error) {
-	cmd := exec.Command("git", "ls-remote", "--tags", "--heads", url)
-	cmd.Env = append(os.Environ(),
-		"GIT_ALLOW_PROTOCOL=https:ssh",
-		"GIT_PROTOCOL_FROM_USER=0",
-	)
-	cmd.Env = append(cmd.Env, env...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	if err := checkRemote(url); err != nil {
+		return nil, err
+	}
+	out, err := outputGit("", env, "ls-remote", "--tags", "--heads", url)
 	if err != nil {
-		return nil, fmt.Errorf("git ls-remote: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return nil, fmt.Errorf("git ls-remote: %w", err)
 	}
 
 	type tagEntry struct {
