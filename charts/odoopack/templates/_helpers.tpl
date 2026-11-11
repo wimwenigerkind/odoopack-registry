@@ -92,3 +92,32 @@ Whether any Secret is wired (rendered or existing).
 {{- define "odoopack.hasSecret" -}}
 {{- if or .Values.existingSecret (gt (len .Values.secrets) 0) -}}true{{- end }}
 {{- end }}
+
+{{/*
+The application config as rendered into config.yaml: config, then limits,
+then extraConfig on top.
+*/}}
+{{- define "odoopack.config" -}}
+{{- $cfg := mergeOverwrite (deepCopy .Values.config) (dict "limits" (deepCopy .Values.limits)) .Values.extraConfig -}}
+{{- toYaml $cfg -}}
+{{- end }}
+
+{{/*
+limits.job_timeout in seconds. Sprig cannot parse a Go duration, so this
+accepts the subset made of whole hours, minutes and seconds ("10m", "1h30m",
+"600s") and fails on anything else.
+*/}}
+{{- define "odoopack.jobTimeoutSeconds" -}}
+{{- $limits := (include "odoopack.config" . | fromYaml).limits | default dict -}}
+{{- $d := toString (required "limits.job_timeout is required" $limits.job_timeout) -}}
+{{- if not (regexMatch "^([0-9]+h)?([0-9]+m)?([0-9]+s)?$" $d) | or (eq $d "") -}}
+{{- fail (printf "limits.job_timeout %q must be whole hours, minutes and seconds, such as 10m or 1h30m" $d) -}}
+{{- end -}}
+{{- $total := 0 -}}
+{{- range $part := regexFindAll "[0-9]+[hms]" $d -1 -}}
+{{- $n := regexFind "[0-9]+" $part | atoi -}}
+{{- $unit := regexFind "[hms]" $part -}}
+{{- $total = add $total (mul $n (get (dict "h" 3600 "m" 60 "s" 1) $unit)) -}}
+{{- end -}}
+{{- $total -}}
+{{- end }}

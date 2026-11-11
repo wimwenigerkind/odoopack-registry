@@ -27,7 +27,8 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "odoopack.serviceAccountName" . }}
-      terminationGracePeriodSeconds: {{ .Values.worker.terminationGracePeriodSeconds }}
+      {{- /* A stopping worker finishes the job in hand, so it gets the job timeout and two minutes to spare. */}}
+      terminationGracePeriodSeconds: {{ add (include "odoopack.jobTimeoutSeconds" . | atoi) 120 }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}

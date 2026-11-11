@@ -5,6 +5,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/wimwenigerkind/odoopack-registry/internal/config"
 	"github.com/wimwenigerkind/odoopack-registry/internal/database"
 	"github.com/wimwenigerkind/odoopack-registry/internal/git"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
@@ -85,8 +87,18 @@ func countJobs(t *testing.T, db *gorm.DB, addonID uuid.UUID, status models.SyncJ
 	return n
 }
 
+var testLimits = config.Limits{
+	ZipMaxSize:      16 << 20,
+	CloneMaxSize:    64 << 20,
+	TagsPerSync:     50,
+	BranchesPerSync: 10,
+	JobTimeout:      10 * time.Minute,
+}
+
+var staleAfter = testLimits.JobTimeout + staleMargin
+
 func newTestConsumer(db *gorm.DB) *Consumer {
-	return NewConsumer(db, repository.NewAddonVersionRepository(db), nil, nil, nil, time.Second)
+	return NewConsumer(db, repository.NewAddonVersionRepository(db), nil, nil, nil, time.Second, testLimits)
 }
 
 func TestEnqueueKeepsOnePendingJob(t *testing.T) {
@@ -191,7 +203,7 @@ func TestReapRequeuesStaleJob(t *testing.T) {
 		}
 	}
 
-	jobs, versions, err := reap(context.Background(), db)
+	jobs, versions, err := reap(context.Background(), db, staleAfter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +255,7 @@ func TestReapRequeuesStaleJob(t *testing.T) {
 		}
 	}
 
-	if jobs, _, err := reap(context.Background(), db); err != nil || jobs != 0 {
+	if jobs, _, err := reap(context.Background(), db, staleAfter); err != nil || jobs != 0 {
 		t.Errorf("second reap = %d, %v, want nothing", jobs, err)
 	}
 }
@@ -329,5 +341,32 @@ func TestFailedJobGivesWayToPendingJob(t *testing.T) {
 	}
 	if n := countJobs(t, db, addon.ID, models.SyncJobPending); n != 1 {
 		t.Errorf("pending jobs = %d, want 1", n)
+	}
+}
+
+// An archive above the zip limit fails the version with a build_error that
+// says so, and no artifact is stored.
+func TestZipOverTheLimitFailsTheBuild(t *testing.T) {
+	db := testDB(t)
+	addon := newAddon(t, db)
+
+	c := newTestConsumer(db)
+	c.lsRemote = func(context.Context, string, []string) ([]git.Ref, error) {
+		return []git.Ref{{Type: git.RefTag, Name: "19.0.1.0.0", SHA: "0123456789abcdef0123456789abcdef01234567"}}, nil
+	}
+	c.cloneAndZip = func(context.Context, string, []string, string, string, string) (git.ArchiveResult, error) {
+		return git.ArchiveResult{}, fmt.Errorf("git archive 19.0.1.0.0: %w of 100 MiB", git.ErrZipTooLarge)
+	}
+	job := models.SyncJob{AddonID: addon.ID, Name: addon.Name, GitURL: addon.Repo.GitURL}
+	if err := c.process(context.Background(), slog.New(slog.DiscardHandler), job); !errors.Is(err, git.ErrZipTooLarge) {
+		t.Fatalf("process err = %v, want ErrZipTooLarge", err)
+	}
+
+	v, err := repository.NewAddonVersionRepository(db).Get(addon.ID, "19.0.1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Status != models.StatusFailed || !strings.Contains(v.BuildError, "archive exceeds the zip size limit of 100 MiB") {
+		t.Errorf("version = %s %q, want failed with the size limit", v.Status, v.BuildError)
 	}
 }

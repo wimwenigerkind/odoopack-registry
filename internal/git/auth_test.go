@@ -23,6 +23,7 @@ func TestFailedCloneKeepsTokenOut(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	git.SkipRemoteCheck(t)
+	limits := git.SizeLimits{Clone: 64 << 20, Zip: 16 << 20}
 
 	var mu sync.Mutex
 	var seen []string
@@ -66,8 +67,8 @@ func TestFailedCloneKeepsTokenOut(t *testing.T) {
 			ctx := context.Background()
 
 			_, lsErr := git.LsRemote(ctx, remote.URL, env)
-			_, cloneErr := git.CloneAndZip(ctx, remote.URL, env, "main", "r", "")
-			_, fetchErr := git.CloneAndZipAtSHA(ctx, remote.URL, env, "0123456789abcdef0123456789abcdef01234567", "r", "")
+			_, cloneErr := git.CloneAndZip(ctx, remote.URL, env, "main", "r", "", limits)
+			_, fetchErr := git.CloneAndZipAtSHA(ctx, remote.URL, env, "0123456789abcdef0123456789abcdef01234567", "r", "", limits)
 			for _, err := range []error{lsErr, cloneErr, fetchErr} {
 				if err == nil {
 					t.Fatal("want an error from a forbidden remote")

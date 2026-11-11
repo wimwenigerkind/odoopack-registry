@@ -33,8 +33,8 @@ func TestNetworkOperationsCheckTheRemote(t *testing.T) {
 	const url = "https://git.example.com/acme/addons.git"
 	ctx := context.Background()
 	_, lsErr := LsRemote(ctx, url, nil)
-	_, cloneErr := CloneAndZip(ctx, url, nil, "main", "r", "")
-	_, fetchErr := CloneAndZipAtSHA(ctx, url, nil, "0123456789abcdef0123456789abcdef01234567", "r", "")
+	_, cloneErr := CloneAndZip(ctx, url, nil, "main", "r", "", testLimits)
+	_, fetchErr := CloneAndZipAtSHA(ctx, url, nil, "0123456789abcdef0123456789abcdef01234567", "r", "", testLimits)
 	for _, err := range []error{lsErr, cloneErr, fetchErr} {
 		if !errors.Is(err, validate.ErrHostNotAllowed) {
 			t.Errorf("err = %v, want ErrHostNotAllowed", err)

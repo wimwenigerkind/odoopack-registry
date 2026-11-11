@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -16,11 +17,15 @@ import (
 
 type WebhookHandler struct {
 	addons *repository.AddonRepository
-	tokens *repository.ApiTokenRepository
+	tokens middleware.TokenStore
 	queue  *worker.Queue
 }
 
-func NewWebhookHandler(addons *repository.AddonRepository, tokens *repository.ApiTokenRepository, queue *worker.Queue) *WebhookHandler {
+// maxWebhookBytes bounds the push payload. Only repository.full_name is read,
+// and a push event with its commit list stays far below 1 MiB.
+const maxWebhookBytes = 1 << 20
+
+func NewWebhookHandler(addons *repository.AddonRepository, tokens middleware.TokenStore, queue *worker.Queue) *WebhookHandler {
 	return &WebhookHandler{addons: addons, tokens: tokens, queue: queue}
 }
 
@@ -46,7 +51,12 @@ func (h *WebhookHandler) Forgejo(c *gin.Context) {
 		return
 	}
 
-	body, err := io.ReadAll(c.Request.Body)
+	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, maxWebhookBytes))
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "payload too large"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "could not read body"})
 		return

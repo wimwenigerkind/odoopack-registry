@@ -39,7 +39,6 @@ Non-secret settings live under `config` and are rendered into a `config.yaml` th
 | `web.autoscaling.enabled` | `false` | HPA for the web deployment |
 | `worker.replicaCount` | `1` | Worker replicas |
 | `worker.healthPort` | `6970` | Worker health endpoint port |
-| `worker.terminationGracePeriodSeconds` | `720` | Time a stopping worker gets to finish its running job; keep it above the 10 minute job timeout |
 | `migration.enabled` | `true` | Run migrations in the `migrate` init container of the web pods |
 | `migration.resources` | `{}` | Resources of the `migrate` init container |
 | `config.base_url` | `http://localhost` | Public base URL, must be set |
@@ -64,6 +63,26 @@ During a rolling update the old pods keep serving while a new pod migrates, so a
 The worker does not migrate. Until a migration has created the schema it waits, checking with a backoff of up to 30 seconds, and starts taking jobs afterwards.
 
 Set `migration.enabled: false` only if you run `migrate` yourself, against the same database and with the same config and Secret, before every upgrade.
+
+### Limits
+
+The `limits` block is rendered into `config.yaml` and bounds what a single
+user can make the registry do. Web and worker refuse to start when a value
+does not parse, a size or count is zero or negative, `zip_max_size` exceeds
+`clone_max_size` or `job_timeout` is below one minute. Sizes take binary
+units (`KiB`, `MiB`, `GiB`, `TiB`, case insensitive) or plain bytes; decimal
+units like `MB` are refused. Set the limits here and not through `LIMITS_*`
+env vars, because the worker's termination grace period is derived from
+`job_timeout`.
+
+| Key | Default | What it bounds |
+| --- | --- | --- |
+| `limits.zip_max_size` | `100MiB` | Zip of one version; a larger one fails the build with a build error |
+| `limits.clone_max_size` | `1GiB` | What one shallow clone or fetch writes to disk; a watchdog kills git above it. Each worker needs `worker.count` times this in temp space |
+| `limits.tags_per_sync` | `50` | Release tags one sync builds, newest by version first |
+| `limits.branches_per_sync` | `10` | Branches one sync builds, the default branch first |
+| `limits.sync_interval` | `1m` | Minimum time between two manual syncs of one addon, across all web replicas; `0s` turns it off |
+| `limits.job_timeout` | `10m` | Longest a sync job runs, git included; whole `h`, `m` and `s` only. The worker's `terminationGracePeriodSeconds` is this plus two minutes |
 
 ### Secret keys
 

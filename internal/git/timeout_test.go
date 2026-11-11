@@ -42,11 +42,11 @@ func TestGitStopsAtTheContextDeadline(t *testing.T) {
 			return err
 		},
 		"clone": func(ctx context.Context) error {
-			_, err := CloneAndZip(ctx, url, env, "main", "addons", "")
+			_, err := CloneAndZip(ctx, url, env, "main", "addons", "", testLimits)
 			return err
 		},
 		"fetch": func(ctx context.Context) error {
-			_, err := CloneAndZipAtSHA(ctx, url, env, "0123456789abcdef0123456789abcdef01234567", "addons", "")
+			_, err := CloneAndZipAtSHA(ctx, url, env, "0123456789abcdef0123456789abcdef01234567", "addons", "", testLimits)
 			return err
 		},
 	}

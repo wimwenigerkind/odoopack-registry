@@ -48,9 +48,8 @@ web:
 worker:
   replicaCount: 1
   healthPort: 6970
-  # A stopping worker finishes the job in hand, which runs for at most 10
-  # minutes; keep this above that so the job is not killed halfway.
-  terminationGracePeriodSeconds: 720
+  # The termination grace period is limits.job_timeout plus two minutes, so a
+  # stopping worker finishes the job in hand.
   resources: {}
   podAnnotations: {}
   nodeSelector: {}
@@ -112,6 +111,25 @@ config:
   # auth.cookie_secure follows the scheme of base_url unless set explicitly.
   log:
     level: info
+
+# What a single user can make the registry do, rendered into config.yaml as
+# limits. Sizes take binary units (KiB, MiB, GiB, TiB) or plain bytes.
+# Set them here rather than through LIMITS_* env vars: the worker's
+# termination grace period is derived from job_timeout.
+limits:
+  # Largest zip of one version; at most clone_max_size.
+  zip_max_size: 100MiB
+  # Largest shallow clone a build may write to disk; each worker needs
+  # worker.count times this in free temp space.
+  clone_max_size: 1GiB
+  # Newest release tags and branches one sync builds.
+  tags_per_sync: 50
+  branches_per_sync: 10
+  # Minimum time between two manual syncs of one addon; 0s turns it off.
+  sync_interval: 1m
+  # Longest a sync job runs, whole hours, minutes and seconds only (the
+  # chart computes the grace period from it); at least 1m.
+  job_timeout: 10m
 
 # Deep-merged over config above; use for auth providers and overrides.
 extraConfig: {}

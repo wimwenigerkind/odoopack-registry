@@ -28,6 +28,7 @@ var schema = []any{
 	&models.AddonVersion{},
 	&models.AddonVersionReadme{},
 	&models.SyncJob{},
+	&models.SyncTrigger{},
 	&models.Group{},
 	&models.GroupMembership{},
 	&models.GroupAddonAccess{},

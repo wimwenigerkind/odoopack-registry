@@ -9,10 +9,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// staleAfter is how long a job may stay running before the reaper assumes its
-// worker died. It lies above jobTimeout, so a live worker always finishes or
-// fails its job before the reaper touches it.
-const staleAfter = jobTimeout + 5*time.Minute
+// A job may stay running for the job timeout plus staleMargin before the
+// reaper assumes its worker died, so a live worker always finishes or fails
+// its job before the reaper touches it.
+const staleMargin = 5 * time.Minute
 
 const reapInterval = time.Minute
 
@@ -26,7 +26,7 @@ func (c *Consumer) reapLoop(ctx context.Context) {
 	t := time.NewTicker(reapInterval)
 	defer t.Stop()
 	for {
-		jobs, versions, err := reap(ctx, c.db)
+		jobs, versions, err := reap(ctx, c.db, c.limits.JobTimeout+staleMargin)
 		switch {
 		case err != nil:
 			if ctx.Err() == nil {
@@ -51,7 +51,7 @@ func (c *Consumer) reapLoop(ctx context.Context) {
 // one that keeps killing its worker ends as failed. When a newer pending job
 // exists for the addon, the stale one is deleted instead, since only one
 // pending job per addon may exist.
-func reap(ctx context.Context, db *gorm.DB) (jobs, versions int64, err error) {
+func reap(ctx context.Context, db *gorm.DB, staleAfter time.Duration) (jobs, versions int64, err error) {
 	err = db.WithContext(ctx).Raw(`
 WITH stale AS (
 	SELECT id FROM sync_jobs

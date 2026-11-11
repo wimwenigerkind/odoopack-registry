@@ -19,6 +19,7 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/bootstrap"
 	"github.com/wimwenigerkind/odoopack-registry/internal/config"
 	"github.com/wimwenigerkind/odoopack-registry/internal/database"
+	"github.com/wimwenigerkind/odoopack-registry/internal/git"
 	"github.com/wimwenigerkind/odoopack-registry/internal/handler"
 	"github.com/wimwenigerkind/odoopack-registry/internal/logger"
 	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
@@ -42,6 +43,10 @@ func main() {
 
 	mode := viper.GetString("instance.mode")
 	if err := config.ValidateInstanceMode(mode); err != nil {
+		bootstrap.Fatal("config", err)
+	}
+	limits, err := config.LoadLimits()
+	if err != nil {
 		bootstrap.Fatal("config", err)
 	}
 
@@ -71,6 +76,7 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	groupRepo := repository.NewGroupRepository(db)
 	tokenRepo := repository.NewApiTokenRepository(db)
+	syncTriggerRepo := repository.NewSyncTriggerRepository(db)
 	integrationRepo := repository.NewIntegrationRepository(db, cipher)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -102,8 +108,8 @@ func main() {
 	addonHandler := handler.NewAddonHandler(addonRepo, repoRepo, versionRepo, groupRepo, userRepo, integrationRepo, store, mode)
 	repoHandler := handler.NewRepoHandler(repoRepo, addonRepo, groupRepo, userRepo, integrationRepo, mode)
 	downloadHandler := handler.NewDownloadHandler(addonRepo, versionRepo, groupRepo, userRepo, store, mode)
-	triggerHandler := handler.NewTriggerHandler(addonRepo, userRepo, queue)
-	registryHandler := handler.NewRegistryHandler(addonRepo, groupRepo, userRepo, integrationRepo, authRegistry, store, mode, baseURL)
+	triggerHandler := handler.NewTriggerHandler(addonRepo, userRepo, syncTriggerRepo, queue, limits.SyncInterval)
+	registryHandler := handler.NewRegistryHandler(addonRepo, groupRepo, userRepo, integrationRepo, authRegistry, store, mode, baseURL, git.SizeLimits{Clone: limits.CloneMaxSize, Zip: limits.ZipMaxSize})
 	var explicitSecure *bool
 	if viper.IsSet("auth.cookie_secure") {
 		v := viper.GetBool("auth.cookie_secure")

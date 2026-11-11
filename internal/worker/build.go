@@ -1,17 +1,20 @@
 package worker
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
+	"github.com/wimwenigerkind/odoopack-registry/internal/config"
 	"github.com/wimwenigerkind/odoopack-registry/internal/git"
 	"github.com/wimwenigerkind/odoopack-registry/internal/markdown"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
@@ -30,26 +33,22 @@ type Consumer struct {
 	storage         storage.Storage
 	id              string
 	pollInterval    time.Duration
+	limits          config.Limits
 	wg              sync.WaitGroup
 
 	lsRemote    func(ctx context.Context, url string, env []string) ([]git.Ref, error)
 	cloneAndZip func(ctx context.Context, url string, env []string, ref, rootDir, subpath string) (git.ArchiveResult, error)
 }
 
-// jobTimeout bounds one sync job, git included. The chart's
-// worker.terminationGracePeriodSeconds must stay above it, because a
-// shutdown lets the running job finish instead of discarding its builds.
-const jobTimeout = 10 * time.Minute
-
 // retryBackoff is the delay before a failed job runs again, multiplied by
 // the number of attempts so far.
 const retryBackoff = 30 * time.Second
 
-func NewConsumer(db *gorm.DB, versionRepo *repository.AddonVersionRepository, integrationRepo *repository.IntegrationRepository, authRegistry *auth.Registry, store storage.Storage, pollInterval time.Duration) *Consumer {
+func NewConsumer(db *gorm.DB, versionRepo *repository.AddonVersionRepository, integrationRepo *repository.IntegrationRepository, authRegistry *auth.Registry, store storage.Storage, pollInterval time.Duration, limits config.Limits) *Consumer {
 	if pollInterval <= 0 {
 		pollInterval = 2 * time.Second
 	}
-	return &Consumer{
+	c := &Consumer{
 		db:              db,
 		versionRepo:     versionRepo,
 		integrationRepo: integrationRepo,
@@ -57,9 +56,14 @@ func NewConsumer(db *gorm.DB, versionRepo *repository.AddonVersionRepository, in
 		storage:         store,
 		id:              "worker-" + uuid.NewString(),
 		pollInterval:    pollInterval,
+		limits:          limits,
 		lsRemote:        git.LsRemote,
-		cloneAndZip:     git.CloneAndZip,
 	}
+	sizes := git.SizeLimits{Clone: limits.CloneMaxSize, Zip: limits.ZipMaxSize}
+	c.cloneAndZip = func(ctx context.Context, url string, env []string, ref, rootDir, subpath string) (git.ArchiveResult, error) {
+		return git.CloneAndZip(ctx, url, env, ref, rootDir, subpath, sizes)
+	}
+	return c
 }
 
 func (c *Consumer) Run(ctx context.Context, workers int) {
@@ -130,7 +134,7 @@ func (c *Consumer) handle(ctx context.Context, log *slog.Logger, job models.Sync
 
 	// A shutdown stops the claiming but not the job in hand: it runs to its
 	// own deadline within the pod's termination grace period.
-	jobCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), jobTimeout)
+	jobCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), c.limits.JobTimeout)
 	defer cancel()
 
 	if err := c.process(jobCtx, log, job); err != nil {
@@ -193,7 +197,10 @@ func (c *Consumer) process(ctx context.Context, log *slog.Logger, job models.Syn
 		return fmt.Errorf("ls-remote: %w", err)
 	}
 
-	desired := planVersions(refs)
+	desired, skipped := planVersions(refs, job.DefaultBranch, c.limits.TagsPerSync, c.limits.BranchesPerSync)
+	if len(skipped) > 0 {
+		log.Warn("too many refs, skipping the oldest", "skipped", len(skipped), "versions", versionNames(skipped, 20))
+	}
 	if len(desired) == 0 {
 		log.Info("no buildable refs")
 		return nil
@@ -214,17 +221,70 @@ type desiredVersion struct {
 	Ref     git.Ref
 }
 
-func planVersions(refs []git.Ref) []desiredVersion {
-	var out []desiredVersion
+// planVersions returns the refs to build, the newest tags and the default
+// branch first, and those it leaves out because of the limits per sync. The
+// limits keep a repository with thousands of refs from holding a worker for
+// hours.
+func planVersions(refs []git.Ref, defaultBranch string, maxTags, maxBranches int) (desired, skipped []desiredVersion) {
+	type planned struct {
+		desiredVersion
+		v version.Version
+	}
+	var tags, branches []planned
 	for _, r := range refs {
-		v, err := refVersion(r)
+		s, err := refVersion(r)
 		if err != nil {
 			slog.Warn("skipping ref", "type", r.Type, "ref", r.Name, "reason", err)
 			continue
 		}
-		out = append(out, desiredVersion{Version: v, Ref: r})
+		v, _ := version.Parse(s)
+		p := planned{desiredVersion{Version: s, Ref: r}, v}
+		if r.Type == git.RefTag {
+			tags = append(tags, p)
+		} else {
+			branches = append(branches, p)
+		}
 	}
-	return out
+
+	slices.SortFunc(tags, func(a, b planned) int { return version.Compare(b.v, a.v) })
+	// Dev versions have no order of their own: the default branch comes
+	// first, then the series branches from the newest series.
+	slices.SortFunc(branches, func(a, b planned) int {
+		if aDefault, bDefault := a.Ref.Name == defaultBranch, b.Ref.Name == defaultBranch; aDefault != bDefault {
+			if aDefault {
+				return -1
+			}
+			return 1
+		}
+		for i := range a.v.Series {
+			if c := cmp.Compare(b.v.Series[i], a.v.Series[i]); c != 0 {
+				return c
+			}
+		}
+		return strings.Compare(a.Ref.Name, b.Ref.Name)
+	})
+
+	for _, group := range []struct {
+		refs  []planned
+		limit int
+	}{{tags, maxTags}, {branches, maxBranches}} {
+		for i, p := range group.refs {
+			if i < group.limit {
+				desired = append(desired, p.desiredVersion)
+			} else {
+				skipped = append(skipped, p.desiredVersion)
+			}
+		}
+	}
+	return desired, skipped
+}
+
+func versionNames(ds []desiredVersion, limit int) []string {
+	names := make([]string, 0, min(len(ds), limit))
+	for _, d := range ds[:min(len(ds), limit)] {
+		names = append(names, d.Version)
+	}
+	return names
 }
 
 // refVersion publishes a ref only under the canonical spelling that clients

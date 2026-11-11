@@ -33,9 +33,10 @@ type RegistryHandler struct {
 	storage      storage.Storage
 	mode         string
 	baseURL      string
+	sizeLimits   git.SizeLimits
 }
 
-func NewRegistryHandler(addons *repository.AddonRepository, groups *repository.GroupRepository, users *repository.UserRepository, integrations *repository.IntegrationRepository, authRegistry *auth.Registry, store storage.Storage, mode, baseURL string) *RegistryHandler {
+func NewRegistryHandler(addons *repository.AddonRepository, groups *repository.GroupRepository, users *repository.UserRepository, integrations *repository.IntegrationRepository, authRegistry *auth.Registry, store storage.Storage, mode, baseURL string, sizeLimits git.SizeLimits) *RegistryHandler {
 	return &RegistryHandler{
 		addons:       addons,
 		groups:       groups,
@@ -45,6 +46,7 @@ func NewRegistryHandler(addons *repository.AddonRepository, groups *repository.G
 		storage:      store,
 		mode:         mode,
 		baseURL:      strings.TrimRight(baseURL, "/"),
+		sizeLimits:   sizeLimits,
 	}
 }
 
@@ -204,7 +206,7 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 	}
 
 	rootDir := rootDirFor(addon.Name, addon.Subpath)
-	archive, err := git.CloneAndZipAtSHA(ctx, remote.URL, remote.Env, reference, rootDir, addon.Subpath)
+	archive, err := git.CloneAndZipAtSHA(ctx, remote.URL, remote.Env, reference, rootDir, addon.Subpath, h.sizeLimits)
 	if err != nil {
 		slog.Warn("on-demand rebuild failed", "sha", reference, "err", auth.RedactURLCredentials(err.Error()))
 		problem(c, http.StatusNotFound, codeNotFound, "reference not found in git")

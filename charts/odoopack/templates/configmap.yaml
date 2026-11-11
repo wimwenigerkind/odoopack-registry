@@ -6,5 +6,4 @@ metadata:
     {{- include "odoopack.labels" . | nindent 4 }}
 data:
   config.yaml: |
-    {{- $cfg := mergeOverwrite (deepCopy .Values.config) .Values.extraConfig }}
-    {{- toYaml $cfg | nindent 4 }}
+    {{- include "odoopack.config" . | nindent 4 }}

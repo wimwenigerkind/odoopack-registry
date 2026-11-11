@@ -52,6 +52,8 @@ func LoadConfig() {
 
 	viper.SetDefault("integrations.encryption_key", "")
 
+	setLimitDefaults(viper.GetViper())
+
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 

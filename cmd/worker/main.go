@@ -25,6 +25,11 @@ func main() {
 	config.LoadConfig()
 	logger.Setup(viper.GetString("log.level"))
 
+	limits, err := config.LoadLimits()
+	if err != nil {
+		bootstrap.Fatal("config", err)
+	}
+
 	cipher, err := bootstrap.IntegrationCipher()
 	if err != nil {
 		bootstrap.Fatal("integration encryption", err)
@@ -61,7 +66,7 @@ func main() {
 		return
 	}
 
-	consumer := worker.NewConsumer(db, versionRepo, integrationRepo, authRegistry, store, viper.GetDuration("worker.poll_interval"))
+	consumer := worker.NewConsumer(db, versionRepo, integrationRepo, authRegistry, store, viper.GetDuration("worker.poll_interval"), limits)
 	workers := viper.GetInt("worker.count")
 	slog.Info("starting worker", "workers", workers)
 	consumer.Run(ctx, workers)

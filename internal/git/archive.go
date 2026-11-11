@@ -27,7 +27,7 @@ type ArchiveResult struct {
 	Manifest    *odoomanifest.Manifest
 }
 
-func CloneAndZip(ctx context.Context, url string, env []string, ref, rootDir, subpath string) (ArchiveResult, error) {
+func CloneAndZip(ctx context.Context, url string, env []string, ref, rootDir, subpath string, limits SizeLimits) (ArchiveResult, error) {
 	tmp, err := os.MkdirTemp("", "odoopack-build-*")
 	if err != nil {
 		return ArchiveResult{}, err
@@ -38,7 +38,15 @@ func CloneAndZip(ctx context.Context, url string, env []string, ref, rootDir, su
 	if err := checkRemote(ctx, url); err != nil {
 		return ArchiveResult{}, err
 	}
-	if err := runGit(ctx, "", env, "clone", "--depth", "1", "--branch", ref, "--single-branch", url, src); err != nil {
+	// Without a worktree the clone holds only compressed objects, so a small
+	// pack cannot expand on disk at checkout; archive and readBlob read the
+	// object database anyway.
+	cloneCtx, cloneDone := watchSize(ctx, tmp, limits.Clone)
+	err = runGit(cloneCtx, "", env, "clone", "--depth", "1", "--branch", ref, "--single-branch", "--no-checkout", url, src)
+	if sizeErr := cloneDone(); sizeErr != nil {
+		err = sizeErr
+	}
+	if err != nil {
 		return ArchiveResult{}, fmt.Errorf("git clone %s@%s: %w", url, ref, err)
 	}
 
@@ -47,34 +55,16 @@ func CloneAndZip(ctx context.Context, url string, env []string, ref, rootDir, su
 		treeish = ref + ":" + cleaned
 	}
 
-	outFile, err := os.CreateTemp("", "odoopack-zip-*.zip")
+	outName, size, err := writeArchive(ctx, src, rootDir, treeish, limits.Zip)
 	if err != nil {
 		return ArchiveResult{}, err
 	}
-	outName := outFile.Name()
-	_ = outFile.Close()
-
 	keep := false
 	defer func() {
 		if !keep {
 			_ = os.Remove(outName)
 		}
 	}()
-
-	prefix := strings.TrimSuffix(rootDir, "/") + "/"
-	if err := runGit(ctx, src, nil, "archive",
-		"--format=zip",
-		"--prefix="+prefix,
-		"-o", outName,
-		treeish,
-	); err != nil {
-		return ArchiveResult{}, fmt.Errorf("git archive %s: %w", treeish, err)
-	}
-
-	info, err := os.Stat(outName)
-	if err != nil {
-		return ArchiveResult{}, err
-	}
 
 	hash, err := sha256File(outName)
 	if err != nil {
@@ -85,13 +75,13 @@ func CloneAndZip(ctx context.Context, url string, env []string, ref, rootDir, su
 	return ArchiveResult{
 		ZipPath:     outName,
 		ContentHash: hash,
-		SizeBytes:   info.Size(),
+		SizeBytes:   size,
 		Readme:      readReadme(ctx, src, ref, subpath),
 		Manifest:    readManifest(ctx, src, ref, subpath),
 	}, nil
 }
 
-func CloneAndZipAtSHA(ctx context.Context, url string, env []string, sha, rootDir, subpath string) (ArchiveResult, error) {
+func CloneAndZipAtSHA(ctx context.Context, url string, env []string, sha, rootDir, subpath string, limits SizeLimits) (ArchiveResult, error) {
 	tmp, err := os.MkdirTemp("", "odoopack-pinned-*")
 	if err != nil {
 		return ArchiveResult{}, err
@@ -111,13 +101,13 @@ func CloneAndZipAtSHA(ctx context.Context, url string, env []string, sha, rootDi
 	if err := checkRemote(ctx, url); err != nil {
 		return ArchiveResult{}, err
 	}
-	if err := runGit(ctx, src, env, "fetch", "--depth", "1", "origin", sha); err != nil {
-		if err := checkRemote(ctx, url); err != nil {
-			return ArchiveResult{}, err
-		}
-		if err := runGit(ctx, src, env, "fetch", "--tags", "origin"); err != nil {
-			return ArchiveResult{}, fmt.Errorf("git fetch %s: %w", sha, err)
-		}
+	fetchCtx, fetchDone := watchSize(ctx, tmp, limits.Clone)
+	err = fetchSHA(fetchCtx, src, env, url, sha)
+	if sizeErr := fetchDone(); sizeErr != nil {
+		err = fmt.Errorf("git fetch %s: %w", sha, sizeErr)
+	}
+	if err != nil {
+		return ArchiveResult{}, err
 	}
 
 	treeish := sha
@@ -125,13 +115,10 @@ func CloneAndZipAtSHA(ctx context.Context, url string, env []string, sha, rootDi
 		treeish = sha + ":" + cleaned
 	}
 
-	outFile, err := os.CreateTemp("", "odoopack-zip-*.zip")
+	outName, size, err := writeArchive(ctx, src, rootDir, treeish, limits.Zip)
 	if err != nil {
 		return ArchiveResult{}, err
 	}
-	outName := outFile.Name()
-	_ = outFile.Close()
-
 	keep := false
 	defer func() {
 		if !keep {
@@ -139,20 +126,6 @@ func CloneAndZipAtSHA(ctx context.Context, url string, env []string, sha, rootDi
 		}
 	}()
 
-	prefix := strings.TrimSuffix(rootDir, "/") + "/"
-	if err := runGit(ctx, src, nil, "archive",
-		"--format=zip",
-		"--prefix="+prefix,
-		"-o", outName,
-		treeish,
-	); err != nil {
-		return ArchiveResult{}, fmt.Errorf("git archive %s: %w", treeish, err)
-	}
-
-	info, err := os.Stat(outName)
-	if err != nil {
-		return ArchiveResult{}, err
-	}
 	hash, err := sha256File(outName)
 	if err != nil {
 		return ArchiveResult{}, err
@@ -162,10 +135,48 @@ func CloneAndZipAtSHA(ctx context.Context, url string, env []string, sha, rootDi
 	return ArchiveResult{
 		ZipPath:     outName,
 		ContentHash: hash,
-		SizeBytes:   info.Size(),
+		SizeBytes:   size,
 		Readme:      readReadme(ctx, src, sha, subpath),
 		Manifest:    readManifest(ctx, src, sha, subpath),
 	}, nil
+}
+
+func fetchSHA(ctx context.Context, src string, env []string, url, sha string) error {
+	if err := runGit(ctx, src, env, "fetch", "--depth", "1", "origin", sha); err != nil {
+		if err := checkRemote(ctx, url); err != nil {
+			return err
+		}
+		if err := runGit(ctx, src, env, "fetch", "--tags", "origin"); err != nil {
+			return fmt.Errorf("git fetch %s: %w", sha, err)
+		}
+	}
+	return nil
+}
+
+// writeArchive zips treeish from the repository in src into a new temp file
+// and returns its path. The zip streams through a cappedWriter, so an archive
+// above limit fails without ever being written in full.
+func writeArchive(ctx context.Context, src, rootDir, treeish string, limit int64) (string, int64, error) {
+	outFile, err := os.CreateTemp("", "odoopack-zip-*.zip")
+	if err != nil {
+		return "", 0, err
+	}
+	outName := outFile.Name()
+	w := &cappedWriter{f: outFile, limit: limit}
+
+	prefix := strings.TrimSuffix(rootDir, "/") + "/"
+	err = streamGit(ctx, src, nil, w, "archive", "--format=zip", "--prefix="+prefix, treeish)
+	if closeErr := outFile.Close(); err == nil {
+		err = closeErr
+	}
+	if w.over {
+		err = fmt.Errorf("%w of %s", ErrZipTooLarge, formatBytes(limit))
+	}
+	if err != nil {
+		_ = os.Remove(outName)
+		return "", 0, fmt.Errorf("git archive %s: %w", treeish, err)
+	}
+	return outName, w.written, nil
 }
 
 // maxMetadataBytes caps the README and manifest read from a repository; a
@@ -274,18 +285,27 @@ func gitCommand(ctx context.Context, workdir string, env []string, args ...strin
 }
 
 func outputGit(ctx context.Context, workdir string, env []string, args ...string) ([]byte, error) {
+	var out bytes.Buffer
+	if err := streamGit(ctx, workdir, env, &out, args...); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
+
+func streamGit(ctx context.Context, workdir string, env []string, stdout io.Writer, args ...string) error {
 	cmd := gitCommand(ctx, workdir, env, args...)
 	var stderr bytes.Buffer
+	cmd.Stdout = stdout
 	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if err != nil {
-		// A killed git reports only "signal: killed"; the context says why.
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, fmt.Errorf("%w: %w", ctxErr, err)
+	if err := cmd.Run(); err != nil {
+		// A killed git reports only "signal: killed"; the context says why,
+		// and its cause names the limit when the clone watchdog killed it.
+		if ctx.Err() != nil {
+			return fmt.Errorf("%w: %w", context.Cause(ctx), err)
 		}
-		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
 	}
-	return out, nil
+	return nil
 }
 
 func sha256File(path string) (string, error) {

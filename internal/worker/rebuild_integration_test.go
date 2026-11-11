@@ -33,7 +33,7 @@ func buildConsumer(t *testing.T, db *gorm.DB, build func(sha string) (git.Archiv
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := NewConsumer(db, repository.NewAddonVersionRepository(db), nil, nil, store, time.Second)
+	c := NewConsumer(db, repository.NewAddonVersionRepository(db), nil, nil, store, time.Second, testLimits)
 	c.cloneAndZip = func(_ context.Context, _ string, _ []string, ref, _, _ string) (git.ArchiveResult, error) {
 		return build(ref)
 	}
