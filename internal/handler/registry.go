@@ -66,10 +66,7 @@ func (h *RegistryHandler) Get(c *gin.Context) {
 		return
 	}
 
-	if visible, err := h.addons.ListVisibleTo(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), h.mode, ""); err == nil {
-		allNames, _ := h.addons.ListAllNames()
-		resolveDepends(addon.Versions, visible, allNames)
-	}
+	resolveVersionDepends(h.addons, addon.Versions, currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), h.mode)
 
 	c.JSON(http.StatusOK, registryResponse(addon, h.baseURL))
 }

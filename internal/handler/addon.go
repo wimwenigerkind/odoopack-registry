@@ -68,10 +68,7 @@ func (h *AddonHandler) Get(c *gin.Context) {
 	}
 	hideFromNonWriters(addon, canWriteAddon(c, addon, h.users))
 	annotateVersions(addon.Versions)
-	if visible, err := h.addons.ListVisibleTo(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), h.mode, ""); err == nil {
-		allNames, _ := h.addons.ListAllNames()
-		resolveDepends(addon.Versions, visible, allNames)
-	}
+	resolveVersionDepends(h.addons, addon.Versions, currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), h.mode)
 	c.JSON(http.StatusOK, addon)
 }
 

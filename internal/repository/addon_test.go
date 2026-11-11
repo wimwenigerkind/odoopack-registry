@@ -55,8 +55,8 @@ func TestVisibleQueriesByMode(t *testing.T) {
 				return (*queries)[len(*queries)-1]
 			}
 			sqls := map[string]string{
-				"ListVisibleTo": outer("ListVisibleTo", func() error {
-					_, err := repo.ListVisibleTo(tc.userID, tc.isAdmin, tc.mode, "")
+				"ListVisibleByModule": outer("ListVisibleByModule", func() error {
+					_, err := repo.ListVisibleByModule(tc.userID, tc.isAdmin, tc.mode, []string{"acme_essentials"})
 					return err
 				}),
 				"VisibleReadyVersions": outer("VisibleReadyVersions", func() error {

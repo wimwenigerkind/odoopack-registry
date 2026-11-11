@@ -90,6 +90,9 @@ func migrate(db *gorm.DB, cipher *crypto.Cipher) error {
 	if err := db.AutoMigrate(schema...); err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
+	if err := indexAddonModuleNames(db); err != nil {
+		return fmt.Errorf("failed to index addon module names: %w", err)
+	}
 
 	if cipher != nil {
 		if err := sealIntegrationTokens(db, cipher); err != nil {

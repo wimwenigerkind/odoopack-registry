@@ -109,9 +109,16 @@ func (r *AddonRepository) ListByOwnerAndRepoPath(ownerID uuid.UUID, repoPath str
 	return addons, err
 }
 
-func (r *AddonRepository) ListAllNames() ([]string, error) {
+// moduleNameSQL is name.ModuleName as SQL, so a module name from a manifest
+// finds its addon without loading every name. Migrate indexes the same
+// expression; the two have to change together.
+const moduleNameSQL = "translate(addons.name, '/-', '__')"
+
+// ListNamesByModule returns the names of all addons, visible or not, whose
+// module name is one of modules.
+func (r *AddonRepository) ListNamesByModule(modules []string) ([]string, error) {
 	var names []string
-	err := r.db.Model(&models.Addon{}).Pluck("name", &names).Error
+	err := r.db.Model(&models.Addon{}).Where(moduleNameSQL+" IN ?", modules).Pluck("name", &names).Error
 	return names, err
 }
 
@@ -187,17 +194,10 @@ func (r *AddonRepository) VisibleReadyVersions(userID *uuid.UUID, isAdmin bool, 
 	return versions, err
 }
 
-func (r *AddonRepository) ListVisibleTo(userID *uuid.UUID, isAdmin bool, mode, nameFilter string) ([]models.Addon, error) {
+func (r *AddonRepository) ListVisibleByModule(userID *uuid.UUID, isAdmin bool, mode string, modules []string) ([]models.Addon, error) {
 	var addons []models.Addon
-	q := r.VisibleQuery(userID, isAdmin, mode, AddonSearch{}).
-		Preload("Versions").
-		Preload("Repo").
-		Preload("Repo.Owner")
-
-	if nameFilter != "" {
-		q = q.Where("addons.name = ?", nameFilter)
-	}
-
-	err := q.Find(&addons).Error
+	err := r.VisibleQuery(userID, isAdmin, mode, AddonSearch{}).
+		Where(moduleNameSQL+" IN ?", modules).
+		Find(&addons).Error
 	return addons, err
 }
