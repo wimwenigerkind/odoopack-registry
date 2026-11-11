@@ -2,7 +2,7 @@ apiVersion: v2
 name: odoopack
 description: Odoo addon package registry with web API, background worker and frontend
 type: application
-version: 0.1.1
+version: 0.2.0
 appVersion: "0.1.0"
 home: https://github.com/wimwenigerkind/odoopack-registry
 sources:
