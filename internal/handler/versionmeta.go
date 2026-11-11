@@ -1,8 +1,8 @@
 package handler
 
 import (
-	odoosemver "github.com/wimwenigerkind/odoopack-semver"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
+	odoosemver "github.com/wimwenigerkind/odoopack-semver"
 )
 
 func annotateVersions(versions []models.AddonVersion) {
