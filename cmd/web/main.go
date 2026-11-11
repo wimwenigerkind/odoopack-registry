@@ -45,12 +45,17 @@ func main() {
 		bootstrap.Fatal("config", err)
 	}
 
+	cipher, err := bootstrap.IntegrationCipher()
+	if err != nil {
+		bootstrap.Fatal("integration encryption", err)
+	}
+
 	db, err := database.Connect(viper.GetString("database.dsn"))
 	if err != nil {
 		bootstrap.Fatal("database connect", err)
 	}
 	if viper.GetBool("auto_migrate") {
-		if err := database.Migrate(db); err != nil {
+		if err := database.Migrate(db, cipher); err != nil {
 			bootstrap.Fatal("database migrate", err)
 		}
 	}
@@ -66,7 +71,7 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	groupRepo := repository.NewGroupRepository(db)
 	tokenRepo := repository.NewApiTokenRepository(db)
-	integrationRepo := repository.NewIntegrationRepository(db)
+	integrationRepo := repository.NewIntegrationRepository(db, cipher)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

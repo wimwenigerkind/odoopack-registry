@@ -12,11 +12,16 @@ func main() {
 	config.LoadConfig()
 	logger.Setup(viper.GetString("log.level"))
 
+	cipher, err := bootstrap.IntegrationCipher()
+	if err != nil {
+		bootstrap.Fatal("integration encryption", err)
+	}
+
 	db, err := database.Connect(viper.GetString("database.dsn"))
 	if err != nil {
 		bootstrap.Fatal("database connect", err)
 	}
-	if err := database.Migrate(db); err != nil {
+	if err := database.Migrate(db, cipher); err != nil {
 		bootstrap.Fatal("database migrate", err)
 	}
 }

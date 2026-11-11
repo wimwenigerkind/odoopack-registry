@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
 	"github.com/wimwenigerkind/odoopack-registry/internal/middleware"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
@@ -124,6 +125,10 @@ func (h *RepoHandler) Update(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		if id := integrationForGitURL(repo.IntegrationID, repo.GitURL, gitURL); id != repo.IntegrationID {
+			repo.IntegrationID = id
+			repo.Integration = nil
+		}
 		repo.GitURL = gitURL
 	}
 
@@ -169,6 +174,18 @@ func (h *RepoHandler) Update(c *gin.Context) {
 	}
 	sanitizeOwner(repo.Owner)
 	c.JSON(http.StatusOK, repo)
+}
+
+// integrationForGitURL drops the integration when the git URL moves to
+// another host. The integration was picked for the old host, so its token
+// belongs to that host's provider. The handler has no provider registry, so
+// it compares with the old URL; the provider's own host check still guards
+// every clone.
+func integrationForGitURL(integrationID *uuid.UUID, oldURL, newURL string) *uuid.UUID {
+	if integrationID == nil || auth.SameGitHost(oldURL, newURL) {
+		return integrationID
+	}
+	return nil
 }
 
 func (h *RepoHandler) Delete(c *gin.Context) {

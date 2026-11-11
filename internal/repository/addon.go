@@ -41,7 +41,7 @@ func (r *AddonRepository) GetByID(id uuid.UUID) (*models.Addon, error) {
 		Preload("Versions").
 		Preload("Repo").
 		Preload("Repo.Owner").
-		Preload("Repo.Integration").
+		Preload("Repo.Integration", withoutTokens).
 		Where("id = ?", id).First(&addon).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound

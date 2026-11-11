@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/wimwenigerkind/odoopack-registry/internal/crypto"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -17,7 +18,10 @@ func Connect(dsn string) (*gorm.DB, error) {
 	return db, nil
 }
 
-func Migrate(db *gorm.DB) error {
+// Migrate brings the schema up to date. cipher seals integration tokens
+// written before they were encrypted; nil skips that step, which is only right
+// when no provider allows git integration and no key is configured.
+func Migrate(db *gorm.DB, cipher *crypto.Cipher) error {
 	if db == nil {
 		return fmt.Errorf("database connection not established")
 	}
@@ -42,6 +46,12 @@ func Migrate(db *gorm.DB) error {
 	)
 	if err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	if cipher != nil {
+		if err := sealIntegrationTokens(db, cipher); err != nil {
+			return fmt.Errorf("failed to seal integration tokens: %w", err)
+		}
 	}
 
 	slog.Info("database migrations completed")

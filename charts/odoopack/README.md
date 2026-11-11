@@ -61,6 +61,26 @@ Non-secret settings live under `config` and are rendered into a `config.yaml` th
 - `STORAGE_S3_SECRET_ACCESS_KEY`
 - `REDIS_URL`
 - `AUTH_<PROVIDER>_CLIENT_SECRET` (per configured auth provider)
+- `INTEGRATIONS_ENCRYPTION_KEY` (required once a provider sets `allow_git_integration`)
+
+The web, worker and migration pods all read these from the same Secret.
+
+### Integration encryption key
+
+The OAuth tokens of git integrations are stored encrypted with AES-256-GCM. The key is `INTEGRATIONS_ENCRYPTION_KEY` (config key `integrations.encryption_key`): base64 of exactly 32 bytes. Generate it once and keep it with your other secrets:
+
+```sh
+openssl rand -base64 32
+```
+
+```yaml
+secrets:
+  INTEGRATIONS_ENCRYPTION_KEY: "..."
+```
+
+As soon as any auth provider sets `allow_git_integration: true`, the web and worker pods refuse to start without a valid key. Without such a provider the key is optional. When the key is set, the migration Job encrypts tokens stored before encryption existed; running it again changes nothing. Pass the key on every `helm upgrade` (or keep it in `existingSecret`), because the rendered Secret is recreated from the values on each upgrade.
+
+Losing or changing the key makes the stored tokens unreadable: builds of repos that clone through an integration fail until their owners connect the same account again in their profile, which overwrites the stored tokens and keeps the repos linked. Repos, addons and published versions stay as they are.
 
 ### Auth providers
 

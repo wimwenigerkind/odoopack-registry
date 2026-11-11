@@ -25,6 +25,11 @@ func main() {
 	config.LoadConfig()
 	logger.Setup(viper.GetString("log.level"))
 
+	cipher, err := bootstrap.IntegrationCipher()
+	if err != nil {
+		bootstrap.Fatal("integration encryption", err)
+	}
+
 	db, err := database.Connect(viper.GetString("database.dsn"))
 	if err != nil {
 		bootstrap.Fatal("database connect", err)
@@ -45,7 +50,7 @@ func main() {
 	authRegistry := auth.NewRegistry(authProviders)
 
 	versionRepo := repository.NewAddonVersionRepository(db)
-	integrationRepo := repository.NewIntegrationRepository(db)
+	integrationRepo := repository.NewIntegrationRepository(db, cipher)
 
 	if addr := viper.GetString("worker.health_address"); addr != "" {
 		startHealthServer(ctx, addr, db)

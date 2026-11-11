@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
+	"github.com/wimwenigerkind/odoopack-registry/internal/crypto"
 	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
 )
 
@@ -75,4 +76,23 @@ func StateStore() (auth.StateStore, error) {
 	default:
 		return nil, fmt.Errorf("unsupported session store %q", kind)
 	}
+}
+
+// IntegrationCipher builds the cipher for integration tokens from
+// integrations.encryption_key. The key is required as soon as a provider
+// allows git integration; without one it is optional and the cipher is nil.
+// A key that is set but invalid is always an error.
+func IntegrationCipher() (*crypto.Cipher, error) {
+	encoded := viper.GetString("integrations.encryption_key")
+	if encoded == "" {
+		if auth.GitIntegrationConfigured() {
+			return nil, fmt.Errorf("integrations.encryption_key is required when a provider allows git integration")
+		}
+		return nil, nil
+	}
+	key, err := crypto.ParseKey(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("integrations.encryption_key: %w", err)
+	}
+	return crypto.NewCipher(key)
 }

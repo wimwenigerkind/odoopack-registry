@@ -46,7 +46,7 @@ func testDB(t *testing.T) *gorm.DB {
 func TestMigrateCreatesApiTokens(t *testing.T) {
 	db := testDB(t)
 	for run := range 2 {
-		if err := Migrate(db); err != nil {
+		if err := Migrate(db, nil); err != nil {
 			t.Fatalf("run %d: %v", run+1, err)
 		}
 	}
@@ -72,7 +72,7 @@ func TestMigrateHashesLegacyTokens(t *testing.T) {
 	}
 
 	for run := range 2 {
-		if err := Migrate(db); err != nil {
+		if err := Migrate(db, nil); err != nil {
 			t.Fatalf("run %d: %v", run+1, err)
 		}
 	}

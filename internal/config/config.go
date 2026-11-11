@@ -48,6 +48,8 @@ func LoadConfig() {
 
 	viper.SetDefault("log.level", "info")
 
+	viper.SetDefault("integrations.encryption_key", "")
+
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 

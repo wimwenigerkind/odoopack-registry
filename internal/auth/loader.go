@@ -93,6 +93,21 @@ func LoadProviders(ctx context.Context, baseURL string) (map[string]Provider, er
 	return out, nil
 }
 
+// GitIntegrationConfigured reports whether a configured provider allows git
+// integration. It reads the configuration without building the providers, so
+// the migration can ask it without reaching an OIDC issuer.
+func GitIntegrationConfigured() bool {
+	for _, name := range collectProviderNames() {
+		switch ProviderType(viper.GetString("auth." + name + ".type")) {
+		case ProviderTypeGitHub, ProviderTypeBitbucket, ProviderTypeForgejo:
+			if viper.GetBool("auth." + name + ".allow_git_integration") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func collectProviderNames() []string {
 	seen := map[string]bool{}
 	var names []string

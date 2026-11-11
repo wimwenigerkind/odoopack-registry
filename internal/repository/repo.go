@@ -39,7 +39,7 @@ func (r *RepoRepository) FindOrCreate(repo *models.Repo) (bool, error) {
 
 func (r *RepoRepository) GetByID(id uuid.UUID) (*models.Repo, error) {
 	var repo models.Repo
-	err := r.db.Preload("Owner").Preload("Integration").Preload("Addons").Where("id = ?", id).First(&repo).Error
+	err := r.db.Preload("Owner").Preload("Integration", withoutTokens).Preload("Addons").Where("id = ?", id).First(&repo).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
 	}
@@ -65,7 +65,7 @@ func (r *RepoRepository) ListByOwner(ownerID uuid.UUID) ([]models.Repo, error) {
 	var repos []models.Repo
 	err := r.db.
 		Preload("Addons").
-		Preload("Integration").
+		Preload("Integration", withoutTokens).
 		Where("owner_id = ?", ownerID).
 		Order("created_at DESC").
 		Find(&repos).Error

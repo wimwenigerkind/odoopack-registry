@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
+	"regexp"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
@@ -38,6 +40,67 @@ func basicAuthRemote(u *url.URL, username, password string) GitRemote {
 			"GIT_CONFIG_VALUE_0=Authorization: Basic " + credentials,
 		},
 	}
+}
+
+var scpLikeRe = regexp.MustCompile(`^(?:[^@:/\s]+@)?([^@:/\s]+):(.*)$`)
+
+// parseGitRemote reads https, ssh and scp-like git URLs; an scp-like one
+// (git@host:owner/repo) comes back as the equivalent ssh URL.
+func parseGitRemote(raw string) (*url.URL, error) {
+	if !strings.Contains(raw, "://") {
+		if m := scpLikeRe.FindStringSubmatch(raw); m != nil {
+			return &url.URL{Scheme: "ssh", Host: m[1], Path: "/" + strings.TrimPrefix(m[2], "/")}, nil
+		}
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme == "" || u.Hostname() == "" {
+		return nil, fmt.Errorf("git URL %q has no scheme or host", raw)
+	}
+	return u, nil
+}
+
+func effectivePort(u *url.URL) string {
+	if p := u.Port(); p != "" {
+		return p
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http":
+		return "80"
+	case "https":
+		return "443"
+	}
+	return ""
+}
+
+// authenticateOn adds credentials only when repoURL points at origin, the
+// provider's own web origin; for any other host it returns the URL untouched,
+// so a token is never sent to a host its provider does not run. ssh and scp
+// URLs on the provider's host are rewritten to https on origin, since the
+// token authenticates over https only. An https URL has to match origin's
+// scheme and port as well, so the header never travels over plain http.
+func authenticateOn(origin *url.URL, repoURL, username, password string) GitRemote {
+	u, err := parseGitRemote(repoURL)
+	if err != nil || !strings.EqualFold(u.Hostname(), origin.Hostname()) {
+		return GitRemote{URL: repoURL}
+	}
+	switch {
+	case strings.EqualFold(u.Scheme, "ssh"):
+	case strings.EqualFold(u.Scheme, origin.Scheme) && effectivePort(u) == effectivePort(origin):
+	default:
+		return GitRemote{URL: repoURL}
+	}
+	return basicAuthRemote(&url.URL{Scheme: origin.Scheme, Host: origin.Host, Path: u.Path, RawPath: u.RawPath}, username, password)
+}
+
+// SameGitHost reports whether two git URLs, in any of the forms git accepts,
+// name the same host.
+func SameGitHost(a, b string) bool {
+	ua, errA := parseGitRemote(a)
+	ub, errB := parseGitRemote(b)
+	return errA == nil && errB == nil && strings.EqualFold(ua.Hostname(), ub.Hostname())
 }
 
 func ResolveGitRemote(ctx context.Context, registry *Registry, store IntegrationStore, gitURL string, integrationID *uuid.UUID) (GitRemote, error) {

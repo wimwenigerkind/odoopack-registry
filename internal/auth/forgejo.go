@@ -29,7 +29,7 @@ type ForgejoProvider struct {
 	cfg         ForgejoConfig
 	baseURL     string
 	apiBase     string
-	host        string
+	origin      *url.URL
 	loginOAuth  *oauth2.Config
 	integOAuth  *oauth2.Config
 	callbackURL string
@@ -55,7 +55,7 @@ func NewForgejoProvider(name string, cfg ForgejoConfig, callbackURL string) (*Fo
 		cfg:         cfg,
 		baseURL:     base,
 		apiBase:     base + "/api/v1",
-		host:        u.Host,
+		origin:      &url.URL{Scheme: u.Scheme, Host: u.Host},
 		callbackURL: callbackURL,
 		loginOAuth: &oauth2.Config{
 			ClientID:     cfg.ClientID,
@@ -132,19 +132,7 @@ func (p *ForgejoProvider) FetchAccountName(ctx context.Context, accessToken stri
 }
 
 func (p *ForgejoProvider) AuthenticateGitRemote(repoURL, accessToken string) GitRemote {
-	sshPrefix := "git@" + p.host + ":"
-	if after, ok := strings.CutPrefix(repoURL, sshPrefix); ok {
-		repoURL = "https://" + p.host + "/" + after
-	}
-	sshURLPrefix := "ssh://git@" + p.host + "/"
-	if after, ok := strings.CutPrefix(repoURL, sshURLPrefix); ok {
-		repoURL = "https://" + p.host + "/" + after
-	}
-	u, err := url.Parse(repoURL)
-	if err != nil || u.Scheme == "" {
-		return GitRemote{URL: repoURL}
-	}
-	return basicAuthRemote(u, accessToken, "")
+	return authenticateOn(p.origin, repoURL, accessToken, "")
 }
 
 type forgejoUser struct {

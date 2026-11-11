@@ -14,7 +14,9 @@ import (
 )
 
 // A failed clone must neither echo the token in its error nor need it in the
-// URL: the server sees it only as the Authorization header.
+// URL: the server sees it only as the Authorization header, and only when it
+// is the provider's own host. The test server is Forgejo's base_url, so
+// GitHub and Bitbucket must not send their tokens to it.
 func TestFailedCloneKeepsTokenOut(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
@@ -42,8 +44,8 @@ func TestFailedCloneKeepsTokenOut(t *testing.T) {
 		provider auth.IntegrationProvider
 		wantAuth string
 	}{
-		{"github", auth.NewGitHubProvider("github", auth.GitHubConfig{}, ""), "oauth2:" + token},
-		{"bitbucket", auth.NewBitbucketProvider("bitbucket", auth.BitbucketConfig{}, ""), "x-token-auth:" + token},
+		{"github", auth.NewGitHubProvider("github", auth.GitHubConfig{}, ""), ""},
+		{"bitbucket", auth.NewBitbucketProvider("bitbucket", auth.BitbucketConfig{}, ""), ""},
 		{"forgejo", forgejo, token + ":"},
 	}
 	for _, p := range providers {
@@ -72,7 +74,10 @@ func TestFailedCloneKeepsTokenOut(t *testing.T) {
 				}
 			}
 
-			want := "Basic " + base64.StdEncoding.EncodeToString([]byte(p.wantAuth))
+			want := ""
+			if p.wantAuth != "" {
+				want = "Basic " + base64.StdEncoding.EncodeToString([]byte(p.wantAuth))
+			}
 			mu.Lock()
 			defer mu.Unlock()
 			if len(seen) == 0 {

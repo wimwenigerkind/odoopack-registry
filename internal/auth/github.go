@@ -16,6 +16,8 @@ import (
 
 const ProviderTypeGitHub ProviderType = "github"
 
+var githubOrigin = &url.URL{Scheme: "https", Host: "github.com"}
+
 type GitHubConfig struct {
 	AllowLogin          bool
 	AllowRegister       bool
@@ -109,14 +111,7 @@ func (p *GitHubProvider) FetchAccountName(ctx context.Context, accessToken strin
 }
 
 func (p *GitHubProvider) AuthenticateGitRemote(repoURL, accessToken string) GitRemote {
-	if after, ok := strings.CutPrefix(repoURL, "git@github.com:"); ok {
-		repoURL = "https://github.com/" + after
-	}
-	u, err := url.Parse(repoURL)
-	if err != nil || u.Scheme == "" {
-		return GitRemote{URL: repoURL}
-	}
-	return basicAuthRemote(u, "oauth2", accessToken)
+	return authenticateOn(githubOrigin, repoURL, "oauth2", accessToken)
 }
 
 func tokenExpiry(token *oauth2.Token) *time.Time {

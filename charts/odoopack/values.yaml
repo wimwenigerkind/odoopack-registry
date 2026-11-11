@@ -114,7 +114,10 @@ config:
 extraConfig: {}
 
 # Secret env vars (DATABASE_DSN, STORAGE_S3_SECRET_ACCESS_KEY, REDIS_URL,
-# AUTH_<PROVIDER>_CLIENT_SECRET). Rendered into a Secret unless existingSecret is set.
+# AUTH_<PROVIDER>_CLIENT_SECRET, INTEGRATIONS_ENCRYPTION_KEY). Rendered into a
+# Secret unless existingSecret is set. INTEGRATIONS_ENCRYPTION_KEY is required
+# once a provider sets allow_git_integration; generate it once with
+# `openssl rand -base64 32` and keep it, see the README.
 secrets: {}
 existingSecret: ""
 

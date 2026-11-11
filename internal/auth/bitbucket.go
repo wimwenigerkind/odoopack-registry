@@ -15,6 +15,8 @@ import (
 
 const ProviderTypeBitbucket ProviderType = "bitbucket"
 
+var bitbucketOrigin = &url.URL{Scheme: "https", Host: "bitbucket.org"}
+
 var bitbucketEndpoint = oauth2.Endpoint{
 	AuthURL:   "https://bitbucket.org/site/oauth2/authorize",
 	TokenURL:  "https://bitbucket.org/site/oauth2/access_token",
@@ -111,17 +113,7 @@ func (p *BitbucketProvider) FetchAccountName(ctx context.Context, accessToken st
 }
 
 func (p *BitbucketProvider) AuthenticateGitRemote(repoURL, accessToken string) GitRemote {
-	if after, ok := strings.CutPrefix(repoURL, "git@bitbucket.org:"); ok {
-		repoURL = "https://bitbucket.org/" + after
-	}
-	if after, ok := strings.CutPrefix(repoURL, "ssh://git@bitbucket.org/"); ok {
-		repoURL = "https://bitbucket.org/" + after
-	}
-	u, err := url.Parse(repoURL)
-	if err != nil || u.Scheme == "" {
-		return GitRemote{URL: repoURL}
-	}
-	return basicAuthRemote(u, "x-token-auth", accessToken)
+	return authenticateOn(bitbucketOrigin, repoURL, "x-token-auth", accessToken)
 }
 
 type bbUser struct {
