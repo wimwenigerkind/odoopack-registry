@@ -2,17 +2,18 @@ package handler
 
 import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
-	"github.com/wimwenigerkind/odoopack-registry/internal/naming"
+	"github.com/wimwenigerkind/odoopack-spec/name"
+	"github.com/wimwenigerkind/odoopack-spec/registryapi"
 )
 
 func resolveDepends(versions []models.AddonVersion, visible []models.Addon, allNames []string) {
 	visByModule := make(map[string]*models.Addon, len(visible))
 	for i := range visible {
-		visByModule[naming.ModuleName(visible[i].Name)] = &visible[i]
+		visByModule[name.ModuleName(visible[i].Name)] = &visible[i]
 	}
 	existsByModule := make(map[string]bool, len(allNames))
 	for _, n := range allNames {
-		existsByModule[naming.ModuleName(n)] = true
+		existsByModule[name.ModuleName(n)] = true
 	}
 
 	for vi := range versions {
@@ -28,11 +29,11 @@ func resolveDepends(versions []models.AddonVersion, visible []models.Addon, allN
 				id := a.ID
 				rd.AddonID = &id
 				rd.Name = a.Name
-				rd.Access = "ok"
+				rd.Access = registryapi.AccessOK
 			case existsByModule[module]:
-				rd.Access = "forbidden"
+				rd.Access = registryapi.AccessForbidden
 			default:
-				rd.Access = "external"
+				rd.Access = registryapi.AccessExternal
 			}
 			resolved = append(resolved, rd)
 		}

@@ -20,6 +20,8 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
+	"github.com/wimwenigerkind/odoopack-spec/digest"
+	"github.com/wimwenigerkind/odoopack-spec/registryapi"
 )
 
 type RegistryHandler struct {
@@ -46,27 +48,7 @@ func NewRegistryHandler(addons *repository.AddonRepository, groups *repository.G
 	}
 }
 
-type registryVersion struct {
-	Version   string        `json:"version"`
-	Type      string        `json:"type"`
-	URL       string        `json:"url"`
-	Shasum    string        `json:"shasum,omitempty"`
-	Reference string        `json:"reference,omitempty"`
-	Depends   []registryDep `json:"depends,omitempty"`
-}
-
-type registryDep struct {
-	Module  string `json:"module"`
-	Package string `json:"package,omitempty"`
-	Access  string `json:"access"`
-}
-
 var referenceRe = regexp.MustCompile(`^[0-9a-fA-F]{7,64}$`)
-
-type registryAddon struct {
-	Name     string            `json:"name"`
-	Versions []registryVersion `json:"versions"`
-}
 
 func (h *RegistryHandler) Get(c *gin.Context) {
 	name := strings.TrimPrefix(c.Param("name"), "/")
@@ -94,27 +76,39 @@ func (h *RegistryHandler) Get(c *gin.Context) {
 
 // registryResponse lists only the ready versions, with the depends that
 // resolveDepends filled in; it touches no database so the contract test can
-// check its output against docs/openapi.yaml.
-func registryResponse(addon *models.Addon, baseURL string) registryAddon {
-	versions := make([]registryVersion, 0, len(addon.Versions))
+// check its output against docs/openapi.yaml. Rows published before the
+// worker enforced canonical versions are still in the database; they are
+// left out instead of breaking the contract.
+func registryResponse(addon *models.Addon, baseURL string) registryapi.Addon {
+	versions := make([]registryapi.Version, 0, len(addon.Versions))
 	for _, v := range addon.Versions {
 		if v.Status != models.StatusReady {
 			continue
 		}
-		deps := make([]registryDep, 0, len(v.DependsResolved))
-		for _, rd := range v.DependsResolved {
-			deps = append(deps, registryDep{Module: rd.Module, Package: rd.Name, Access: rd.Access})
+		sum, err := digest.Parse(v.ContentHash)
+		if err != nil {
+			slog.Warn("skipping version with invalid content hash", "addon", addon.Name, "version", v.Version, "err", err)
+			continue
 		}
-		versions = append(versions, registryVersion{
+		deps := make([]registryapi.Dep, 0, len(v.DependsResolved))
+		for _, rd := range v.DependsResolved {
+			deps = append(deps, registryapi.Dep{Module: rd.Module, Package: rd.Name, Access: rd.Access})
+		}
+		rv := registryapi.Version{
 			Version:   v.Version,
-			Type:      "zip",
-			URL:       fmt.Sprintf("%s/registry/v1/zipball/%s/%s", baseURL, addon.ID, strings.TrimPrefix(v.ContentHash, "sha256:")),
-			Shasum:    v.ContentHash,
+			Type:      registryapi.TypeZip,
+			URL:       fmt.Sprintf("%s/registry/v1/zipball/%s/%s", baseURL, addon.ID, sum.Hex()),
+			Shasum:    sum.String(),
 			Reference: v.RefValue,
 			Depends:   deps,
-		})
+		}
+		if err := rv.Validate(); err != nil {
+			slog.Warn("skipping version outside the registry contract", "addon", addon.Name, "version", v.Version, "err", err)
+			continue
+		}
+		versions = append(versions, rv)
 	}
-	return registryAddon{Name: addon.Name, Versions: versions}
+	return registryapi.Addon{Name: addon.Name, Versions: versions}
 }
 
 func (h *RegistryHandler) Zipball(c *gin.Context) {
@@ -142,10 +136,16 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 		return
 	}
 
-	wantHash := "sha256:" + reference
-	for i := range addon.Versions {
-		av := &addon.Versions[i]
-		if av.Status == models.StatusReady && av.ContentHash == wantHash {
+	// Only a full sha256 hex is a content hash; a shorter reference is a commit.
+	if want, err := digest.Parse("sha256:" + reference); err == nil {
+		for i := range addon.Versions {
+			av := &addon.Versions[i]
+			if av.Status != models.StatusReady {
+				continue
+			}
+			if got, err := digest.Parse(av.ContentHash); err != nil || got != want {
+				continue
+			}
 			if rc, err := h.storage.Get(context.Background(), av.StorageKey); err == nil {
 				streamZip(c, rc, addon.Name, av.Version, av.RefValue)
 				return
@@ -216,7 +216,7 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 	defer func() { _ = os.Remove(archive.ZipPath) }()
 
 	gotHash := "sha256:" + archive.ContentHash
-	if expected := expectedContentHash(addon.Versions, reference); expected != "" && gotHash != expected {
+	if expected := expectedContentHash(addon.Versions, reference); expected != "" && !sameDigest(expected, gotHash) {
 		slog.Warn("on-demand rebuild hash mismatch, refusing to serve",
 			"sha", reference, "expected", expected, "got", gotHash)
 		problem(c, http.StatusConflict, codeConflict, "artifact unavailable: rebuilt content does not match the published checksum")
@@ -244,6 +244,14 @@ func expectedContentHash(versions []models.AddonVersion, reference string) strin
 		}
 	}
 	return ""
+}
+
+// sameDigest treats a value that does not parse as a mismatch, so a corrupt
+// stored hash refuses the rebuild instead of serving unverified content.
+func sameDigest(a, b string) bool {
+	da, errA := digest.Parse(a)
+	db, errB := digest.Parse(b)
+	return errA == nil && errB == nil && da == db
 }
 
 func packageStorageKey(addonID uuid.UUID, version, sha string) string {

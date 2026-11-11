@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -16,9 +15,10 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/git"
 	"github.com/wimwenigerkind/odoopack-registry/internal/markdown"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
-	"github.com/wimwenigerkind/odoopack-registry/internal/naming"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
+	"github.com/wimwenigerkind/odoopack-spec/name"
+	"github.com/wimwenigerkind/odoopack-spec/version"
 	"gorm.io/gorm"
 )
 
@@ -170,19 +170,45 @@ type desiredVersion struct {
 func planVersions(refs []git.Ref) []desiredVersion {
 	var out []desiredVersion
 	for _, r := range refs {
-		switch r.Type {
-		case git.RefTag:
-			v, ok := normalizeVersion(r.Name)
-			if !ok {
-				slog.Warn("skipping non-version tag", "tag", r.Name)
-				continue
-			}
-			out = append(out, desiredVersion{Version: v, Ref: r})
-		case git.RefBranch:
-			out = append(out, desiredVersion{Version: "dev-" + r.Name, Ref: r})
+		v, err := refVersion(r)
+		if err != nil {
+			slog.Warn("skipping ref", "type", r.Type, "ref", r.Name, "reason", err)
+			continue
 		}
+		out = append(out, desiredVersion{Version: v, Ref: r})
 	}
 	return out
+}
+
+// refVersion publishes a ref only under the canonical spelling that clients
+// use as a key and that the registry API accepts, so a tag like 1.2.3 or
+// 19.0.01.0.0 and a branch git allows but the version rules do not are skipped
+// instead of becoming a version every client rejects.
+func refVersion(r git.Ref) (string, error) {
+	var s string
+	switch r.Type {
+	case git.RefTag:
+		s = r.Name
+		if s != "" && (s[0] == 'v' || s[0] == 'V') {
+			s = s[1:]
+		}
+	case git.RefBranch:
+		s = "dev-" + r.Name
+	default:
+		return "", fmt.Errorf("unknown ref type %q", r.Type)
+	}
+	v, err := version.Parse(s)
+	if err != nil {
+		return "", err
+	}
+	if v.String() != s {
+		return "", fmt.Errorf("version %q is not canonical, want %q", s, v.String())
+	}
+	// A tag named dev-<x> parses as a dev version but would be published as an immutable tag.
+	if r.Type == git.RefTag && !v.IsRelease() {
+		return "", fmt.Errorf("tag %q is not a release version", r.Name)
+	}
+	return s, nil
 }
 
 func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, remote auth.GitRemote, d desiredVersion) error {
@@ -222,7 +248,7 @@ func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, remote 
 		return fmt.Errorf("mark building: %w", err)
 	}
 
-	rootDir := naming.ModuleName(job.Name)
+	rootDir := name.ModuleName(job.Name)
 	archive, err := git.CloneAndZip(remote.URL, remote.Env, d.Ref.Name, rootDir, job.Subpath)
 	if err != nil {
 		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
@@ -271,17 +297,4 @@ func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, remote 
 
 	slog.Info("built", "addon", job.Name, "version", d.Version, "ref", d.Ref.SHA, "bytes", archive.SizeBytes)
 	return nil
-}
-
-var versionRe = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*([-+][0-9A-Za-z.-]+)?$`)
-
-func normalizeVersion(tag string) (string, bool) {
-	v := strings.TrimSpace(tag)
-	if v != "" && (v[0] == 'v' || v[0] == 'V') {
-		v = v[1:]
-	}
-	if v == "" || !versionRe.MatchString(v) {
-		return "", false
-	}
-	return v, true
 }

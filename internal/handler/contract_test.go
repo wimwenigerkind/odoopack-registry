@@ -75,6 +75,11 @@ func TestRegistryContract(t *testing.T) {
 	healthCheck := healthCheckAddon()
 	unbuilt := &models.Addon{Name: "essentials"}
 	byName := map[string]*models.Addon{healthCheck.Name: healthCheck, unbuilt.Name: unbuilt}
+	for _, addon := range byName {
+		if err := registryResponse(addon, contractBaseURL).Validate(); err != nil {
+			t.Errorf("registryResponse(%q).Validate(): %v", addon.Name, err)
+		}
+	}
 
 	r := gin.New()
 	r.GET("/registry/v1/addons/*name", func(c *gin.Context) {
@@ -131,5 +136,25 @@ func TestRegistryContract(t *testing.T) {
 				t.Logf("body: %s", rec.Body)
 			}
 		})
+	}
+}
+
+func TestRegistryResponseLeavesOutVersionsOutsideTheContract(t *testing.T) {
+	addon := healthCheckAddon()
+	legacy := addon.Versions[0]
+	legacy.Version = "1.2.3"
+	addon.Versions = append(addon.Versions, legacy)
+
+	resp := registryResponse(addon, contractBaseURL)
+	if err := resp.Validate(); err != nil {
+		t.Fatalf("response breaks the contract: %v", err)
+	}
+	for _, v := range resp.Versions {
+		if v.Version == "1.2.3" {
+			t.Fatalf("version %q is outside the contract but was listed", v.Version)
+		}
+	}
+	if len(resp.Versions) != 2 {
+		t.Fatalf("got %d versions, want the 2 valid ready ones", len(resp.Versions))
 	}
 }

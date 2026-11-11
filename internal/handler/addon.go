@@ -15,7 +15,7 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 	"github.com/wimwenigerkind/odoopack-registry/internal/storage"
 	"github.com/wimwenigerkind/odoopack-registry/internal/validate"
-	odoosemver "github.com/wimwenigerkind/odoopack-semver"
+	"github.com/wimwenigerkind/odoopack-spec/version"
 	paginate "github.com/wimwenigerkind/paginate"
 	ginx "github.com/wimwenigerkind/paginate/ginx"
 )
@@ -134,7 +134,7 @@ func (h *AddonHandler) ListSeries(c *gin.Context) {
 
 	seen := make(map[string]struct{})
 	for _, vs := range versions {
-		v, err := odoosemver.Parse(vs)
+		v, err := version.Parse(vs)
 		if err != nil {
 			continue
 		}
