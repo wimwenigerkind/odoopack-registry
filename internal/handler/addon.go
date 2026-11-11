@@ -138,7 +138,10 @@ func (h *AddonHandler) ListSeries(c *gin.Context) {
 		if err != nil {
 			continue
 		}
-		seen[v.SeriesString()] = struct{}{}
+		// A dev version of a branch such as main has no series.
+		if s := v.SeriesString(); s != "" {
+			seen[s] = struct{}{}
+		}
 	}
 
 	series := make([]string, 0, len(seen))

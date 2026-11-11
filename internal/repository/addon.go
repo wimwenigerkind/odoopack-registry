@@ -174,7 +174,9 @@ func (r *AddonRepository) VisibleQuery(userID *uuid.UUID, isAdmin bool, mode str
 }
 
 func (r *AddonRepository) VisibleReadyVersions(userID *uuid.UUID, isAdmin bool, mode string) ([]string, error) {
-	visibleIDs := r.VisibleQuery(userID, isAdmin, mode, AddonSearch{}).Select("addons.id")
+	// VisibleQuery joins Repo, and gorm selects the joined columns too, which an
+	// IN subquery cannot take; reading only the id from it keeps one column.
+	visibleIDs := r.db.Table("(?) AS visible", r.VisibleQuery(userID, isAdmin, mode, AddonSearch{})).Select("visible.id")
 	var versions []string
 	err := r.db.
 		Table("addon_versions AS av").
