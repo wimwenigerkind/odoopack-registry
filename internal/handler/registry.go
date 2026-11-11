@@ -72,15 +72,15 @@ func (h *RegistryHandler) Get(c *gin.Context) {
 	name := strings.TrimPrefix(c.Param("name"), "/")
 	addon, err := h.addons.GetByName(name)
 	if errors.Is(err, repository.ErrNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
+		problem(c, http.StatusNotFound, codeNotFound, "addon not found")
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		problem(c, http.StatusInternalServerError, codeInternalError, "internal error")
 		return
 	}
 	if !canReadAddon(c, addon, h.groups, h.users, h.mode) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
+		problem(c, http.StatusNotFound, codeNotFound, "addon not found")
 		return
 	}
 
@@ -89,6 +89,13 @@ func (h *RegistryHandler) Get(c *gin.Context) {
 		resolveDepends(addon.Versions, visible, allNames)
 	}
 
+	c.JSON(http.StatusOK, registryResponse(addon, h.baseURL))
+}
+
+// registryResponse lists only the ready versions, with the depends that
+// resolveDepends filled in; it touches no database so the contract test can
+// check its output against docs/openapi.yaml.
+func registryResponse(addon *models.Addon, baseURL string) registryAddon {
 	versions := make([]registryVersion, 0, len(addon.Versions))
 	for _, v := range addon.Versions {
 		if v.Status != models.StatusReady {
@@ -101,38 +108,37 @@ func (h *RegistryHandler) Get(c *gin.Context) {
 		versions = append(versions, registryVersion{
 			Version:   v.Version,
 			Type:      "zip",
-			URL:       fmt.Sprintf("%s/registry/v1/zipball/%s/%s", h.baseURL, addon.ID, strings.TrimPrefix(v.ContentHash, "sha256:")),
+			URL:       fmt.Sprintf("%s/registry/v1/zipball/%s/%s", baseURL, addon.ID, strings.TrimPrefix(v.ContentHash, "sha256:")),
 			Shasum:    v.ContentHash,
 			Reference: v.RefValue,
 			Depends:   deps,
 		})
 	}
-
-	c.JSON(http.StatusOK, registryAddon{Name: addon.Name, Versions: versions})
+	return registryAddon{Name: addon.Name, Versions: versions}
 }
 
 func (h *RegistryHandler) Zipball(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("addon_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid addon id"})
+		problem(c, http.StatusBadRequest, codeMalformedRequest, "invalid addon id")
 		return
 	}
 	reference := strings.ToLower(c.Param("reference"))
 	if !referenceRe.MatchString(reference) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid reference"})
+		problem(c, http.StatusBadRequest, codeMalformedRequest, "invalid reference")
 		return
 	}
 	addon, err := h.addons.GetByID(id)
 	if errors.Is(err, repository.ErrNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
+		problem(c, http.StatusNotFound, codeNotFound, "addon not found")
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		problem(c, http.StatusInternalServerError, codeInternalError, "internal error")
 		return
 	}
 	if !canReadAddon(c, addon, h.groups, h.users, h.mode) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "addon not found"})
+		problem(c, http.StatusNotFound, codeNotFound, "addon not found")
 		return
 	}
 
@@ -144,7 +150,7 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 				streamZip(c, rc, addon.Name, av.Version, av.RefValue)
 				return
 			}
-			c.JSON(http.StatusNotFound, gin.H{"error": "artifact unavailable"})
+			problem(c, http.StatusNotFound, codeNotFound, "artifact unavailable")
 			return
 		}
 	}
@@ -153,7 +159,7 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 		if addon.Versions[i].RefValue == reference {
 			av := &addon.Versions[i]
 			if av.Status != models.StatusReady {
-				c.JSON(http.StatusConflict, gin.H{"error": "version not ready", "status": av.Status})
+				problem(c, http.StatusConflict, codeConflict, fmt.Sprintf("version not ready: %s", av.Status))
 				return
 			}
 			if rc, err := h.storage.Get(context.Background(), av.StorageKey); err == nil {
@@ -182,11 +188,11 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 	}
 
 	if !canWriteAddon(c, addon, h.users) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "reference not found"})
+		problem(c, http.StatusNotFound, codeNotFound, "reference not found")
 		return
 	}
 	if addon.Repo == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "reference not found"})
+		problem(c, http.StatusNotFound, codeNotFound, "reference not found")
 		return
 	}
 
@@ -196,7 +202,7 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 	remote, err := auth.ResolveGitRemote(ctx, h.authRegistry, h.integrations, addon.Repo.GitURL, addon.Repo.IntegrationID)
 	if err != nil {
 		slog.Warn("on-demand rebuild: resolve git remote", "sha", reference, "err", err)
-		c.JSON(http.StatusNotFound, gin.H{"error": "reference not found"})
+		problem(c, http.StatusNotFound, codeNotFound, "reference not found")
 		return
 	}
 
@@ -204,7 +210,7 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 	archive, err := git.CloneAndZipAtSHA(remote.URL, remote.Env, reference, rootDir, addon.Subpath)
 	if err != nil {
 		slog.Warn("on-demand rebuild failed", "sha", reference, "err", auth.RedactURLCredentials(err.Error()))
-		c.JSON(http.StatusNotFound, gin.H{"error": "reference not found in git"})
+		problem(c, http.StatusNotFound, codeNotFound, "reference not found in git")
 		return
 	}
 	defer os.Remove(archive.ZipPath)
@@ -213,7 +219,7 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 	if expected := expectedContentHash(addon.Versions, reference); expected != "" && gotHash != expected {
 		slog.Warn("on-demand rebuild hash mismatch, refusing to serve",
 			"sha", reference, "expected", expected, "got", gotHash)
-		c.JSON(http.StatusConflict, gin.H{"error": "artifact unavailable: rebuilt content does not match the published checksum"})
+		problem(c, http.StatusConflict, codeConflict, "artifact unavailable: rebuilt content does not match the published checksum")
 		return
 	}
 
@@ -224,7 +230,7 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 
 	f, err := os.Open(archive.ZipPath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		problem(c, http.StatusInternalServerError, codeInternalError, "internal error")
 		return
 	}
 	streamZip(c, f, addon.Name, "pinned", reference)

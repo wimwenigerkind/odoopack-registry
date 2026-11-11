@@ -1,0 +1,363 @@
+openapi: 3.1.0
+info:
+  title: odoopack registry API
+  version: 1.0.0
+  summary: The public registry API that the odoopack CLI and third-party clients use.
+  license:
+    name: MIT
+    identifier: MIT
+  description: |
+    The registry API under `/registry/v1`, served by `cmd/web`. The `/api/v1`
+    routes of the web frontend are not part of this document yet.
+
+    ## Authentication and instance mode
+
+    Every operation takes an optional API token as `Authorization: Bearer
+    <token>`. Users create tokens in the web frontend. A token that is
+    missing, malformed or unknown is ignored and the request runs as
+    anonymous; these operations never answer `401`.
+
+    What a caller may read depends on the instance mode (`instance.mode`):
+
+    - `public`: public addons need no token; a private addon needs the token
+      of its repository owner, an admin, or a member of a group the addon is
+      shared with.
+    - `private`: every addon needs a token. The token of any user reads the
+      public addons; a private addon needs the same as in `public` mode.
+
+    An addon the caller may not read answers `404`, the same as an addon that
+    does not exist, so the answer does not reveal that it exists.
+
+    ## Names and formats
+
+    The patterns below are the rules of the shared module
+    `github.com/wimwenigerkind/odoopack-spec` (packages `name`, `version`,
+    `digest`, `registryapi`), which the odoopack CLI applies to every version
+    it reads; a client skips a version that breaks them. The registry does
+    not enforce all of them yet when it registers an addon or publishes a git
+    tag as a version, so it can still send a name or version outside them.
+
+    ## Conventions
+
+    - JSON uses snake_case. Ids are UUIDs.
+    - Errors are `application/problem+json` (RFC 9457) with a stable `code`.
+      `type` is `about:blank` and `title` the HTTP status phrase until a page
+      documents the codes.
+    - Any operation can answer `500 internal_error`.
+
+servers:
+  - url: https://registry.example.com
+    description: The instance's `base_url`. Self-hosted, so every instance has its own.
+
+security:
+  - {}
+  - bearerAuth: []
+
+tags:
+  - name: registry
+    description: Addon metadata and archives for package managers.
+
+paths:
+  /registry/v1/addons/{vendor}/{name}:
+    get:
+      tags: [registry]
+      operationId: getVendorAddon
+      summary: Get an addon named vendor/name
+      description: |
+        The same operation as `getAddon`, for a package name with a vendor
+        (`acme/essentials`). The server serves both through one wildcard
+        route and looks up everything after `/addons/` as the package name.
+        A path parameter must not contain a slash, so the two forms of a
+        package name are two paths here.
+      x-service: web
+      parameters:
+        - $ref: '#/components/parameters/Vendor'
+        - $ref: '#/components/parameters/AddonName'
+      responses:
+        '200': { $ref: '#/components/responses/Addon' }
+        '404': { $ref: '#/components/responses/AddonNotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /registry/v1/addons/{name}:
+    get:
+      tags: [registry]
+      operationId: getAddon
+      summary: Get an addon named without a vendor
+      description: |
+        The ready versions of an addon with where to download each one. The
+        dependencies of a version are resolved against the addons the caller
+        may read. See `getVendorAddon` for a name with a vendor.
+      x-service: web
+      parameters:
+        - $ref: '#/components/parameters/AddonName'
+      responses:
+        '200': { $ref: '#/components/responses/Addon' }
+        '404': { $ref: '#/components/responses/AddonNotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /registry/v1/zipball/{addon_id}/{reference}:
+    get:
+      tags: [registry]
+      operationId: getZipball
+      summary: Download the zip archive of a version
+      description: |
+        Streams the archive through the server, for local and S3 storage
+        alike; it never redirects to the storage.
+
+        `reference` is looked up in this order:
+
+        1. A ready version whose `shasum` has this hex. This is the form the
+           `url` of a version uses.
+        2. A version built from this commit id; `409` while it is not ready.
+        3. An earlier build of this commit that is still in storage.
+        4. Only for the repository owner or an admin: the commit is fetched
+           from git and archived on demand, which can take up to two minutes.
+           `409` when the archive does not match the `shasum` published for
+           that commit.
+
+        Steps 2 to 4 compare the full commit id, so an abbreviated one only
+        matches in step 4.
+      x-service: web
+      parameters:
+        - name: addon_id
+          in: path
+          required: true
+          description: The addon's id, as in the `url` of a version.
+          schema: { type: string, format: uuid }
+        - name: reference
+          in: path
+          required: true
+          description: The hex of a `shasum`, or a git commit id. Case does not matter.
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{7,64}$'
+      responses:
+        '200':
+          description: The archive.
+          headers:
+            Content-Disposition:
+              description: '`attachment; filename="<name>-<version>-<first 12 characters of the reference>.zip"`, with `/` in the name replaced by `_` and in the version by `-`.'
+              schema: { type: string }
+          content:
+            application/zip:
+              schema:
+                type: string
+                contentMediaType: application/zip
+        '400':
+          description: '`malformed_request`: `addon_id` is not a UUID or `reference` is not 7 to 64 hex characters.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: |
+            `not_found`: the addon does not exist, the caller may not read
+            it, the reference matches nothing, or the archive is missing from
+            storage.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: |
+            `conflict`: the version of this commit is not ready yet (pending,
+            building or failed), or an archive built on demand does not match
+            the published `shasum`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        An API token of a user, created in the web frontend. Optional; see the
+        description of the API for what it unlocks.
+
+  parameters:
+    Vendor:
+      name: vendor
+      in: path
+      required: true
+      description: The vendor part of the package name, e.g. `acme` in `acme/essentials`.
+      schema: { $ref: '#/components/schemas/NamePart' }
+    AddonName:
+      name: name
+      in: path
+      required: true
+      description: The name part of the package name, e.g. `essentials`.
+      schema: { $ref: '#/components/schemas/NamePart' }
+
+  responses:
+    Addon:
+      description: The addon with its ready versions.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Addon' }
+          examples:
+            withDepends:
+              summary: A version with resolved dependencies
+              value:
+                name: acme/health-check
+                versions:
+                  - version: 19.0.1.0.0
+                    type: zip
+                    url: https://registry.example.com/registry/v1/zipball/f1740dd9-ca0e-42fd-a63b-b553d3fd3882/ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543
+                    shasum: sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543
+                    reference: 6b6c390a387c81ee604b602e49ca6c35646cc619
+                    depends:
+                      - { module: base, access: external }
+                      - { module: acme_essentials, package: acme/essentials, access: ok }
+                      - { module: acme_warranty, access: forbidden }
+    AddonNotFound:
+      description: '`not_found`: no addon has this name, or the caller may not read it.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InternalError:
+      description: '`internal_error`.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    # ------------------------------------------------------------ errors
+    Problem:
+      type: object
+      description: RFC 9457 problem details, written by `problem` in `internal/handler/problem.go`.
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          const: about:blank
+        title: { type: string, description: 'The HTTP status phrase, e.g. `Not Found`.' }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail: { type: string, description: Human-readable explanation of this occurrence. }
+        code: { $ref: '#/components/schemas/ErrorCode' }
+    ErrorCode:
+      type: string
+      description: The `code*` constants of `internal/handler/problem.go`; both lists change together.
+      enum:
+        - malformed_request
+        - not_found
+        - conflict
+        - internal_error
+
+    # ------------------------------------------------------------ names
+    PackageName:
+      type: string
+      description: |
+        `vendor/name` or `name`; each part starts with a lowercase letter or
+        digit and holds lowercase letters, digits, `_` and `-`
+        (`name.ValidPackage`).
+      maxLength: 128
+      pattern: '^[a-z0-9][a-z0-9_-]*(/[a-z0-9][a-z0-9_-]*)?$'
+      examples: [acme/essentials, acme/health-check]
+    NamePart:
+      type: string
+      description: One part of a `PackageName`.
+      maxLength: 128
+      pattern: '^[a-z0-9][a-z0-9_-]*$'
+    ModuleName:
+      type: string
+      description: |
+        The directory name of an Odoo module (`name.ValidModule`). A package
+        maps to its module by replacing `/` and `-` with `_`, so
+        `acme/essentials` provides `acme_essentials`.
+      maxLength: 128
+      pattern: '^[a-z0-9_]+$'
+      examples: [acme_essentials, base]
+
+    # ------------------------------------------------------------ addon
+    Addon:
+      type: object
+      description: Response of `getAddon` and `getVendorAddon` (`registryapi.Addon`).
+      required: [name, versions]
+      properties:
+        name: { $ref: '#/components/schemas/PackageName' }
+        versions:
+          type: array
+          description: |
+            Only the ready versions, in no particular order. Always present,
+            empty when no version is ready yet.
+          items: { $ref: '#/components/schemas/Version' }
+    Version:
+      type: object
+      description: |
+        One version of an addon (`registryapi.Version`). This registry
+        always sends `type` `zip` with `shasum` and `reference`; `git` is part
+        of the shared format for registries that let a client clone instead.
+      required: [version, type, url]
+      properties:
+        version:
+          type: string
+          description: |
+            A release `series.major.minor.patch` with five numeric components
+            and no leading zeros (`19.0.1.2.3`), or `dev-<branch>` for a
+            branch. A branch name also must not contain `..` or end in
+            `.lock` (`version.Parse`).
+          pattern: '^((0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){4}|dev-[A-Za-z0-9._]([A-Za-z0-9._/-]*[A-Za-z0-9._-])?)$'
+          examples: [19.0.1.2.3, dev-main, dev-19.0]
+        type:
+          type: string
+          enum: [zip, git]
+        url:
+          type: string
+          format: uri
+          description: |
+            Where to download the version: for `zip`
+            `<base_url>/registry/v1/zipball/<addon_id>/<hex of shasum>`
+            (`getZipball`). `https`, or `http` only for `localhost`,
+            `127.0.0.1` and `::1`.
+          pattern: '^https?://'
+        shasum:
+          type: string
+          description: The sha256 of the zip archive. Required for `zip`.
+          pattern: '^sha256:[0-9a-f]{64}$'
+        reference:
+          type: string
+          description: |
+            The full git commit id the version was built from: 40 lowercase
+            hex characters, 64 for a repository in the sha256 object format.
+            Required for `git`.
+          pattern: '^([0-9a-f]{40}|[0-9a-f]{64})$'
+        depends:
+          type: array
+          description: |
+            The modules of the manifest's `depends`, resolved for the caller.
+            Absent when the manifest lists none, and also when the registry
+            could not resolve them.
+          items: { $ref: '#/components/schemas/Dependency' }
+      allOf:
+        - if:
+            properties: { type: { const: zip } }
+          then:
+            required: [shasum]
+        - if:
+            properties: { type: { const: git } }
+          then:
+            required: [reference]
+    Dependency:
+      type: object
+      description: |
+        A module the version depends on (`registryapi.Dep`). `access` says
+        how it resolved for this caller:
+
+        - `ok`: an addon the caller may read provides it; `package` names it.
+        - `forbidden`: an addon provides it, but the caller may not read it.
+          `package` is absent so the name does not leak.
+        - `external`: no addon in this registry provides it, e.g. Odoo's `base`.
+      required: [module, access]
+      properties:
+        module: { $ref: '#/components/schemas/ModuleName' }
+        package: { $ref: '#/components/schemas/PackageName' }
+        access:
+          type: string
+          enum: [ok, forbidden, external]
+      if:
+        properties: { access: { const: ok } }
+      then:
+        required: [package]
+      else:
+        not: { required: [package] }
