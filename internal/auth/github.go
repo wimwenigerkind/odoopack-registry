@@ -108,17 +108,15 @@ func (p *GitHubProvider) FetchAccountName(ctx context.Context, accessToken strin
 	return user.Login, nil
 }
 
-func (p *GitHubProvider) AuthenticateGitURL(repoURL, accessToken string) string {
+func (p *GitHubProvider) AuthenticateGitRemote(repoURL, accessToken string) GitRemote {
 	if after, ok := strings.CutPrefix(repoURL, "git@github.com:"); ok {
-		path := after
-		return fmt.Sprintf("https://oauth2:%s@github.com/%s", accessToken, path)
+		repoURL = "https://github.com/" + after
 	}
 	u, err := url.Parse(repoURL)
 	if err != nil || u.Scheme == "" {
-		return repoURL
+		return GitRemote{URL: repoURL}
 	}
-	u.User = url.UserPassword("oauth2", accessToken)
-	return u.String()
+	return basicAuthRemote(u, "oauth2", accessToken)
 }
 
 func tokenExpiry(token *oauth2.Token) *time.Time {

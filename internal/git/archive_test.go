@@ -35,7 +35,7 @@ func commitRepo(t *testing.T, files map[string]string) string {
 		{"-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
 			"commit", "-q", "-m", "init"},
 	} {
-		if err := runGit(dir, args...); err != nil {
+		if err := runGit(dir, nil, args...); err != nil {
 			t.Fatal(err)
 		}
 	}

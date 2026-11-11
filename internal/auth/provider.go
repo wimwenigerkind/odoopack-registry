@@ -44,5 +44,5 @@ type IntegrationProvider interface {
 	ExchangeIntegration(ctx context.Context, code string) (accessToken, refreshToken string, expiresAt *time.Time, err error)
 	RefreshIntegration(ctx context.Context, refreshToken string) (accessToken, newRefreshToken string, expiresAt *time.Time, err error)
 	FetchAccountName(ctx context.Context, accessToken string) (string, error)
-	AuthenticateGitURL(repoURL, accessToken string) string
+	AuthenticateGitRemote(repoURL, accessToken string) GitRemote
 }

@@ -193,17 +193,17 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Minute)
 	defer cancel()
 
-	cloneURL, err := auth.ResolveCloneURL(ctx, h.authRegistry, h.integrations, addon.Repo.GitURL, addon.Repo.IntegrationID)
+	remote, err := auth.ResolveGitRemote(ctx, h.authRegistry, h.integrations, addon.Repo.GitURL, addon.Repo.IntegrationID)
 	if err != nil {
-		slog.Warn("on-demand rebuild: resolve clone url", "sha", reference, "err", err)
+		slog.Warn("on-demand rebuild: resolve git remote", "sha", reference, "err", err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "reference not found"})
 		return
 	}
 
 	rootDir := rootDirFor(addon.Name, addon.Subpath)
-	archive, err := git.CloneAndZipAtSHA(cloneURL, reference, rootDir, addon.Subpath)
+	archive, err := git.CloneAndZipAtSHA(remote.URL, remote.Env, reference, rootDir, addon.Subpath)
 	if err != nil {
-		slog.Warn("on-demand rebuild failed", "sha", reference, "err", err)
+		slog.Warn("on-demand rebuild failed", "sha", reference, "err", auth.RedactURLCredentials(err.Error()))
 		c.JSON(http.StatusNotFound, gin.H{"error": "reference not found in git"})
 		return
 	}

@@ -66,6 +66,7 @@ func (h *AddonHandler) Get(c *gin.Context) {
 	if addon.Repo != nil {
 		sanitizeOwner(addon.Repo.Owner)
 	}
+	hideFromNonWriters(addon, canWriteAddon(c, addon, h.users))
 	annotateVersions(addon.Versions)
 	if visible, err := h.addons.ListVisibleTo(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), ""); err == nil {
 		allNames, _ := h.addons.ListAllNames()
@@ -95,7 +96,9 @@ func mustAddonPaginator() *paginate.Paginator {
 }
 
 func (h *AddonHandler) List(c *gin.Context) {
-	q := h.addons.VisibleQuery(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), repository.AddonSearch{
+	uid, signedIn := middleware.CurrentUserID(c)
+	isAdmin := isCurrentUserAdmin(c, h.users)
+	q := h.addons.VisibleQuery(currentUserIDPtr(c), isAdmin, repository.AddonSearch{
 		Query:  strings.TrimSpace(c.Query("q")),
 		Series: strings.TrimSpace(c.Query("series")),
 	}).
@@ -111,9 +114,12 @@ func (h *AddonHandler) List(c *gin.Context) {
 		return
 	}
 	for i := range page.Data {
-		if page.Data[i].Repo != nil {
-			sanitizeOwner(page.Data[i].Repo.Owner)
+		repo := page.Data[i].Repo
+		if repo != nil {
+			sanitizeOwner(repo.Owner)
 		}
+		// Same rule as canWriteAddon, without a user lookup per row.
+		hideFromNonWriters(&page.Data[i], isAdmin || (signedIn && repo != nil && repo.OwnerID == uid))
 		annotateVersions(page.Data[i].Versions)
 	}
 	c.JSON(http.StatusOK, page)

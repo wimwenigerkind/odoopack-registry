@@ -24,7 +24,7 @@ type ArchiveResult struct {
 	Manifest    *odoomanifest.Manifest
 }
 
-func CloneAndZip(url, ref, rootDir, subpath string) (ArchiveResult, error) {
+func CloneAndZip(url string, env []string, ref, rootDir, subpath string) (ArchiveResult, error) {
 	tmp, err := os.MkdirTemp("", "odoopack-build-*")
 	if err != nil {
 		return ArchiveResult{}, err
@@ -32,7 +32,7 @@ func CloneAndZip(url, ref, rootDir, subpath string) (ArchiveResult, error) {
 	defer os.RemoveAll(tmp)
 
 	src := filepath.Join(tmp, "src")
-	if err := runGit("", "clone", "--depth", "1", "--branch", ref, "--single-branch", url, src); err != nil {
+	if err := runGit("", env, "clone", "--depth", "1", "--branch", ref, "--single-branch", url, src); err != nil {
 		return ArchiveResult{}, fmt.Errorf("git clone %s@%s: %w", url, ref, err)
 	}
 
@@ -56,7 +56,7 @@ func CloneAndZip(url, ref, rootDir, subpath string) (ArchiveResult, error) {
 	}()
 
 	prefix := strings.TrimSuffix(rootDir, "/") + "/"
-	if err := runGit(src, "archive",
+	if err := runGit(src, nil, "archive",
 		"--format=zip",
 		"--prefix="+prefix,
 		"-o", outName,
@@ -85,7 +85,7 @@ func CloneAndZip(url, ref, rootDir, subpath string) (ArchiveResult, error) {
 	}, nil
 }
 
-func CloneAndZipAtSHA(url, sha, rootDir, subpath string) (ArchiveResult, error) {
+func CloneAndZipAtSHA(url string, env []string, sha, rootDir, subpath string) (ArchiveResult, error) {
 	tmp, err := os.MkdirTemp("", "odoopack-pinned-*")
 	if err != nil {
 		return ArchiveResult{}, err
@@ -96,14 +96,14 @@ func CloneAndZipAtSHA(url, sha, rootDir, subpath string) (ArchiveResult, error) 
 	if err := os.MkdirAll(src, 0o755); err != nil {
 		return ArchiveResult{}, err
 	}
-	if err := runGit(src, "init", "-q"); err != nil {
+	if err := runGit(src, nil, "init", "-q"); err != nil {
 		return ArchiveResult{}, fmt.Errorf("git init: %w", err)
 	}
-	if err := runGit(src, "remote", "add", "origin", url); err != nil {
+	if err := runGit(src, nil, "remote", "add", "origin", url); err != nil {
 		return ArchiveResult{}, fmt.Errorf("git remote add: %w", err)
 	}
-	if err := runGit(src, "fetch", "--depth", "1", "origin", sha); err != nil {
-		if err := runGit(src, "fetch", "--tags", "origin"); err != nil {
+	if err := runGit(src, env, "fetch", "--depth", "1", "origin", sha); err != nil {
+		if err := runGit(src, env, "fetch", "--tags", "origin"); err != nil {
 			return ArchiveResult{}, fmt.Errorf("git fetch %s: %w", sha, err)
 		}
 	}
@@ -128,7 +128,7 @@ func CloneAndZipAtSHA(url, sha, rootDir, subpath string) (ArchiveResult, error) 
 	}()
 
 	prefix := strings.TrimSuffix(rootDir, "/") + "/"
-	if err := runGit(src, "archive",
+	if err := runGit(src, nil, "archive",
 		"--format=zip",
 		"--prefix="+prefix,
 		"-o", outName,
@@ -191,7 +191,7 @@ func readBlob(srcDir, commitish, subpath string, match func(name string) bool) [
 	if cleaned := strings.Trim(subpath, "/"); cleaned != "" {
 		treeish = commitish + ":" + cleaned
 	}
-	out, err := outputGit(srcDir, "ls-tree", "-z", "--long", treeish)
+	out, err := outputGit(srcDir, nil, "ls-tree", "-z", "--long", treeish)
 	if err != nil {
 		return nil
 	}
@@ -211,7 +211,7 @@ func readBlob(srcDir, commitish, subpath string, match func(name string) bool) [
 		if err != nil || size > maxMetadataBytes {
 			return nil
 		}
-		data, err := outputGit(srcDir, "cat-file", "blob", fields[2])
+		data, err := outputGit(srcDir, nil, "cat-file", "blob", fields[2])
 		if err != nil {
 			return nil
 		}
@@ -220,12 +220,12 @@ func readBlob(srcDir, commitish, subpath string, match func(name string) bool) [
 	return nil
 }
 
-func runGit(workdir string, args ...string) error {
-	_, err := outputGit(workdir, args...)
+func runGit(workdir string, env []string, args ...string) error {
+	_, err := outputGit(workdir, env, args...)
 	return err
 }
 
-func outputGit(workdir string, args ...string) ([]byte, error) {
+func outputGit(workdir string, env []string, args ...string) ([]byte, error) {
 	cmd := exec.Command("git", args...)
 	if workdir != "" {
 		cmd.Dir = workdir
@@ -234,6 +234,7 @@ func outputGit(workdir string, args ...string) ([]byte, error) {
 		"GIT_ALLOW_PROTOCOL=https:ssh",
 		"GIT_PROTOCOL_FROM_USER=0",
 	)
+	cmd.Env = append(cmd.Env, env...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

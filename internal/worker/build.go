@@ -109,24 +109,25 @@ RETURNING *`, models.SyncJobRunning, c.id, models.SyncJobPending).Scan(&job).Err
 
 func (c *Consumer) handle(ctx context.Context, log *slog.Logger, job models.SyncJob) {
 	log = log.With("addon", job.Name, "job", job.ID, "trigger", job.Trigger)
-	log.Info("sync start", "git_url", job.GitURL)
+	log.Info("sync start", "git_url", auth.RedactURLCredentials(job.GitURL))
 
 	if err := c.process(ctx, log, job); err != nil {
 		attempts := job.Attempts + 1
+		errMsg := auth.RedactURLCredentials(err.Error())
 		updates := map[string]any{
 			"attempts":   attempts,
-			"last_error": auth.RedactURLCredentials(err.Error()),
+			"last_error": errMsg,
 			"locked_at":  nil,
 			"locked_by":  "",
 			"updated_at": time.Now(),
 		}
 		if attempts >= job.MaxAttempts {
 			updates["status"] = models.SyncJobFailed
-			log.Error("sync failed permanently", "attempts", attempts, "err", err)
+			log.Error("sync failed permanently", "attempts", attempts, "err", errMsg)
 		} else {
 			updates["status"] = models.SyncJobPending
 			updates["run_after"] = time.Now().Add(time.Duration(attempts) * 30 * time.Second)
-			log.Warn("sync failed, will retry", "attempts", attempts, "err", err)
+			log.Warn("sync failed, will retry", "attempts", attempts, "err", errMsg)
 		}
 		c.db.Model(&models.SyncJob{}).Where("id = ?", job.ID).Updates(updates)
 		return
@@ -137,12 +138,12 @@ func (c *Consumer) handle(ctx context.Context, log *slog.Logger, job models.Sync
 }
 
 func (c *Consumer) process(ctx context.Context, log *slog.Logger, job models.SyncJob) error {
-	cloneURL, err := c.resolveCloneURL(ctx, job.GitURL, job.IntegrationID)
+	remote, err := c.resolveGitRemote(ctx, job.GitURL, job.IntegrationID)
 	if err != nil {
-		return fmt.Errorf("resolve clone url: %w", err)
+		return fmt.Errorf("resolve git remote: %w", err)
 	}
 
-	refs, err := git.LsRemote(cloneURL)
+	refs, err := git.LsRemote(remote.URL, remote.Env)
 	if err != nil {
 		return fmt.Errorf("ls-remote: %w", err)
 	}
@@ -154,8 +155,8 @@ func (c *Consumer) process(ctx context.Context, log *slog.Logger, job models.Syn
 	}
 
 	for _, d := range desired {
-		if err := c.buildVersion(ctx, job, cloneURL, d); err != nil {
-			log.Error("build version", "version", d.Version, "err", err)
+		if err := c.buildVersion(ctx, job, remote, d); err != nil {
+			log.Error("build version", "version", d.Version, "err", auth.RedactURLCredentials(err.Error()))
 		}
 	}
 	return nil
@@ -184,7 +185,7 @@ func planVersions(refs []git.Ref) []desiredVersion {
 	return out
 }
 
-func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, cloneURL string, d desiredVersion) error {
+func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, remote auth.GitRemote, d desiredVersion) error {
 	refType := models.RefTypeTag
 	if d.Ref.Type == git.RefBranch {
 		refType = models.RefTypeBranch
@@ -222,7 +223,7 @@ func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, cloneUR
 	}
 
 	rootDir := naming.ModuleName(job.Name)
-	archive, err := git.CloneAndZip(cloneURL, d.Ref.Name, rootDir, job.Subpath)
+	archive, err := git.CloneAndZip(remote.URL, remote.Env, d.Ref.Name, rootDir, job.Subpath)
 	if err != nil {
 		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
 		return err

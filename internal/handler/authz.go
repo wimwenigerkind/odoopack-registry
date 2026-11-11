@@ -29,6 +29,21 @@ func sanitizeOwner(u *models.User) {
 	u.Email = ""
 }
 
+// hideFromNonWriters drops what only the addon's writers may see: a build
+// error carries git output, the integration names the owner's linked account.
+func hideFromNonWriters(addon *models.Addon, writer bool) {
+	if writer {
+		return
+	}
+	for i := range addon.Versions {
+		addon.Versions[i].BuildError = ""
+	}
+	if addon.Repo != nil {
+		addon.Repo.IntegrationID = nil
+		addon.Repo.Integration = nil
+	}
+}
+
 func currentUserIDPtr(c *gin.Context) *uuid.UUID {
 	if id, ok := middleware.CurrentUserID(c); ok {
 		return &id

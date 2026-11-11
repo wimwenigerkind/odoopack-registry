@@ -131,23 +131,20 @@ func (p *ForgejoProvider) FetchAccountName(ctx context.Context, accessToken stri
 	return user.Login, nil
 }
 
-func (p *ForgejoProvider) AuthenticateGitURL(repoURL, accessToken string) string {
+func (p *ForgejoProvider) AuthenticateGitRemote(repoURL, accessToken string) GitRemote {
 	sshPrefix := "git@" + p.host + ":"
 	if after, ok := strings.CutPrefix(repoURL, sshPrefix); ok {
-		path := after
-		return fmt.Sprintf("https://%s@%s/%s", url.QueryEscape(accessToken), p.host, path)
+		repoURL = "https://" + p.host + "/" + after
 	}
 	sshURLPrefix := "ssh://git@" + p.host + "/"
 	if after, ok := strings.CutPrefix(repoURL, sshURLPrefix); ok {
-		path := after
-		return fmt.Sprintf("https://%s@%s/%s", url.QueryEscape(accessToken), p.host, path)
+		repoURL = "https://" + p.host + "/" + after
 	}
 	u, err := url.Parse(repoURL)
 	if err != nil || u.Scheme == "" {
-		return repoURL
+		return GitRemote{URL: repoURL}
 	}
-	u.User = url.User(accessToken)
-	return u.String()
+	return basicAuthRemote(u, accessToken, "")
 }
 
 type forgejoUser struct {

@@ -110,21 +110,18 @@ func (p *BitbucketProvider) FetchAccountName(ctx context.Context, accessToken st
 	return user.DisplayName, nil
 }
 
-func (p *BitbucketProvider) AuthenticateGitURL(repoURL, accessToken string) string {
+func (p *BitbucketProvider) AuthenticateGitRemote(repoURL, accessToken string) GitRemote {
 	if after, ok := strings.CutPrefix(repoURL, "git@bitbucket.org:"); ok {
-		path := after
-		return fmt.Sprintf("https://x-token-auth:%s@bitbucket.org/%s", accessToken, path)
+		repoURL = "https://bitbucket.org/" + after
 	}
 	if after, ok := strings.CutPrefix(repoURL, "ssh://git@bitbucket.org/"); ok {
-		path := after
-		return fmt.Sprintf("https://x-token-auth:%s@bitbucket.org/%s", accessToken, path)
+		repoURL = "https://bitbucket.org/" + after
 	}
 	u, err := url.Parse(repoURL)
 	if err != nil || u.Scheme == "" {
-		return repoURL
+		return GitRemote{URL: repoURL}
 	}
-	u.User = url.UserPassword("x-token-auth", accessToken)
-	return u.String()
+	return basicAuthRemote(u, "x-token-auth", accessToken)
 }
 
 type bbUser struct {

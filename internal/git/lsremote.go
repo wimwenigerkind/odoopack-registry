@@ -22,12 +22,13 @@ type Ref struct {
 	SHA  string
 }
 
-func LsRemote(url string) ([]Ref, error) {
+func LsRemote(url string, env []string) ([]Ref, error) {
 	cmd := exec.Command("git", "ls-remote", "--tags", "--heads", url)
 	cmd.Env = append(os.Environ(),
 		"GIT_ALLOW_PROTOCOL=https:ssh",
 		"GIT_PROTOCOL_FROM_USER=0",
 	)
+	cmd.Env = append(cmd.Env, env...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
