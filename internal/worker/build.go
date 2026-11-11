@@ -31,7 +31,19 @@ type Consumer struct {
 	id              string
 	pollInterval    time.Duration
 	wg              sync.WaitGroup
+
+	lsRemote    func(ctx context.Context, url string, env []string) ([]git.Ref, error)
+	cloneAndZip func(ctx context.Context, url string, env []string, ref, rootDir, subpath string) (git.ArchiveResult, error)
 }
+
+// jobTimeout bounds one sync job, git included. The chart's
+// worker.terminationGracePeriodSeconds must stay above it, because a
+// shutdown lets the running job finish instead of discarding its builds.
+const jobTimeout = 10 * time.Minute
+
+// retryBackoff is the delay before a failed job runs again, multiplied by
+// the number of attempts so far.
+const retryBackoff = 30 * time.Second
 
 func NewConsumer(db *gorm.DB, versionRepo *repository.AddonVersionRepository, integrationRepo *repository.IntegrationRepository, authRegistry *auth.Registry, store storage.Storage, pollInterval time.Duration) *Consumer {
 	if pollInterval <= 0 {
@@ -45,10 +57,14 @@ func NewConsumer(db *gorm.DB, versionRepo *repository.AddonVersionRepository, in
 		storage:         store,
 		id:              "worker-" + uuid.NewString(),
 		pollInterval:    pollInterval,
+		lsRemote:        git.LsRemote,
+		cloneAndZip:     git.CloneAndZip,
 	}
 }
 
 func (c *Consumer) Run(ctx context.Context, workers int) {
+	c.wg.Add(1)
+	go c.reapLoop(ctx)
 	for i := range workers {
 		c.wg.Add(1)
 		go c.loop(ctx, i)
@@ -91,13 +107,14 @@ func (c *Consumer) claim(ctx context.Context) (models.SyncJob, bool, error) {
 	err := c.db.WithContext(ctx).Raw(`
 UPDATE sync_jobs SET status = ?, locked_at = now(), locked_by = ?, updated_at = now()
 WHERE id = (
-	SELECT id FROM sync_jobs
+	SELECT id FROM sync_jobs j
 	WHERE status = ? AND run_after <= now()
+	AND NOT EXISTS (SELECT 1 FROM sync_jobs r WHERE r.addon_id = j.addon_id AND r.status = ?)
 	ORDER BY created_at
 	FOR UPDATE SKIP LOCKED
 	LIMIT 1
 )
-RETURNING *`, models.SyncJobRunning, c.id, models.SyncJobPending).Scan(&job).Error
+RETURNING *`, models.SyncJobRunning, c.id, models.SyncJobPending, models.SyncJobRunning).Scan(&job).Error
 	if err != nil {
 		return models.SyncJob{}, false, err
 	}
@@ -111,7 +128,12 @@ func (c *Consumer) handle(ctx context.Context, log *slog.Logger, job models.Sync
 	log = log.With("addon", job.Name, "job", job.ID, "trigger", job.Trigger)
 	log.Info("sync start", "git_url", auth.RedactURLCredentials(job.GitURL))
 
-	if err := c.process(ctx, log, job); err != nil {
+	// A shutdown stops the claiming but not the job in hand: it runs to its
+	// own deadline within the pod's termination grace period.
+	jobCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), jobTimeout)
+	defer cancel()
+
+	if err := c.process(jobCtx, log, job); err != nil {
 		attempts := job.Attempts + 1
 		errMsg := auth.RedactURLCredentials(err.Error())
 		updates := map[string]any{
@@ -124,17 +146,40 @@ func (c *Consumer) handle(ctx context.Context, log *slog.Logger, job models.Sync
 		if attempts >= job.MaxAttempts {
 			updates["status"] = models.SyncJobFailed
 			log.Error("sync failed permanently", "attempts", attempts, "err", errMsg)
+			c.db.Model(&models.SyncJob{}).Where("id = ?", job.ID).Updates(updates)
 		} else {
 			updates["status"] = models.SyncJobPending
-			updates["run_after"] = time.Now().Add(time.Duration(attempts) * 30 * time.Second)
+			updates["run_after"] = time.Now().Add(time.Duration(attempts) * retryBackoff)
 			log.Warn("sync failed, will retry", "attempts", attempts, "err", errMsg)
+			c.requeue(log, job, updates)
 		}
-		c.db.Model(&models.SyncJob{}).Where("id = ?", job.ID).Updates(updates)
 		return
 	}
 
 	c.db.Where("id = ?", job.ID).Delete(&models.SyncJob{})
 	log.Info("sync done")
+}
+
+// requeue returns a running job to pending. Only one pending job per addon
+// may exist, and one that was enqueued meanwhile syncs every ref anyway, so
+// the failed job gives way to it.
+func (c *Consumer) requeue(log *slog.Logger, job models.SyncJob, updates map[string]any) {
+	res := c.db.Model(&models.SyncJob{}).
+		Where("id = ? AND NOT EXISTS (SELECT 1 FROM sync_jobs p WHERE p.addon_id = ? AND p.status = ?)",
+			job.ID, job.AddonID, models.SyncJobPending).
+		Updates(updates)
+	if res.Error == nil && res.RowsAffected > 0 {
+		return
+	}
+	if res.Error != nil && !errors.Is(res.Error, gorm.ErrDuplicatedKey) {
+		log.Error("requeue job", "err", res.Error)
+		return
+	}
+	if err := c.db.Where("id = ?", job.ID).Delete(&models.SyncJob{}).Error; err != nil {
+		log.Error("delete superseded job", "err", err)
+		return
+	}
+	log.Info("sync superseded by a pending job")
 }
 
 func (c *Consumer) process(ctx context.Context, log *slog.Logger, job models.SyncJob) error {
@@ -143,7 +188,7 @@ func (c *Consumer) process(ctx context.Context, log *slog.Logger, job models.Syn
 		return fmt.Errorf("resolve git remote: %w", err)
 	}
 
-	refs, err := git.LsRemote(remote.URL, remote.Env)
+	refs, err := c.lsRemote(ctx, remote.URL, remote.Env)
 	if err != nil {
 		return fmt.Errorf("ls-remote: %w", err)
 	}
@@ -154,12 +199,14 @@ func (c *Consumer) process(ctx context.Context, log *slog.Logger, job models.Syn
 		return nil
 	}
 
+	var errs []error
 	for _, d := range desired {
 		if err := c.buildVersion(ctx, job, remote, d); err != nil {
 			log.Error("build version", "version", d.Version, "err", auth.RedactURLCredentials(err.Error()))
+			errs = append(errs, fmt.Errorf("build %s: %w", d.Version, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 type desiredVersion struct {
@@ -249,7 +296,7 @@ func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, remote 
 	}
 
 	rootDir := name.ModuleName(job.Name)
-	archive, err := git.CloneAndZip(remote.URL, remote.Env, d.Ref.Name, rootDir, job.Subpath)
+	archive, err := c.cloneAndZip(ctx, remote.URL, remote.Env, d.Ref.Name, rootDir, job.Subpath)
 	if err != nil {
 		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
 		return err

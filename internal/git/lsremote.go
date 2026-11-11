@@ -3,6 +3,7 @@ package git
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 )
@@ -20,11 +21,11 @@ type Ref struct {
 	SHA  string
 }
 
-func LsRemote(url string, env []string) ([]Ref, error) {
-	if err := checkRemote(url); err != nil {
+func LsRemote(ctx context.Context, url string, env []string) ([]Ref, error) {
+	if err := checkRemote(ctx, url); err != nil {
 		return nil, err
 	}
-	out, err := outputGit("", env, "ls-remote", "--tags", "--heads", url)
+	out, err := outputGit(ctx, "", env, "ls-remote", "--tags", "--heads", url)
 	if err != nil {
 		return nil, fmt.Errorf("git ls-remote: %w", err)
 	}

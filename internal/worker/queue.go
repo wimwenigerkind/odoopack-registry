@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type SyncJob struct {
@@ -40,16 +41,7 @@ func (q *Queue) Enqueue(job SyncJob) error {
 		MaxAttempts:   q.maxAttempts,
 		RunAfter:      time.Now(),
 	}
-	return q.db.Transaction(func(tx *gorm.DB) error {
-		var pending int64
-		if err := tx.Model(&models.SyncJob{}).
-			Where("addon_id = ? AND status = ?", job.AddonID, models.SyncJobPending).
-			Count(&pending).Error; err != nil {
-			return err
-		}
-		if pending > 0 {
-			return nil
-		}
-		return tx.Create(&row).Error
-	})
+	// The unique index on active jobs turns a second pending job for the
+	// addon into a no-op: the pending one has not listed the refs yet.
+	return q.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error
 }

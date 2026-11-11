@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,7 +36,7 @@ func commitRepo(t *testing.T, files map[string]string) string {
 		{"-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
 			"commit", "-q", "-m", "init"},
 	} {
-		if err := runGit(dir, nil, args...); err != nil {
+		if err := runGit(context.Background(), dir, nil, args...); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -52,10 +53,10 @@ func TestReadMetadataSkipsSymlinks(t *testing.T) {
 		"__manifest__.py": "->" + secret,
 	})
 
-	if got := readReadme(dir, "main", ""); got != "" {
+	if got := readReadme(context.Background(), dir, "main", ""); got != "" {
 		t.Errorf("readme = %q, want empty", got)
 	}
-	if got := readManifest(dir, "main", ""); got != nil {
+	if got := readManifest(context.Background(), dir, "main", ""); got != nil {
 		t.Errorf("manifest = %+v, want nil", got)
 	}
 }
@@ -100,7 +101,7 @@ func TestReadReadme(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := commitRepo(t, tt.files)
-			if got := readReadme(dir, "main", tt.subpath); got != tt.want {
+			if got := readReadme(context.Background(), dir, "main", tt.subpath); got != tt.want {
 				t.Errorf("readme = %.40q, want %.40q", got, tt.want)
 			}
 		})
@@ -110,7 +111,7 @@ func TestReadReadme(t *testing.T) {
 func TestReadManifest(t *testing.T) {
 	dir := commitRepo(t, map[string]string{"addon/__manifest__.py": testManifest})
 
-	m := readManifest(dir, "main", "addon")
+	m := readManifest(context.Background(), dir, "main", "addon")
 	if m == nil {
 		t.Fatal("manifest = nil, want parsed manifest")
 	}

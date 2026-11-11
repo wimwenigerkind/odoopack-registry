@@ -48,6 +48,9 @@ web:
 worker:
   replicaCount: 1
   healthPort: 6970
+  # A stopping worker finishes the job in hand, which runs for at most 10
+  # minutes; keep this above that so the job is not killed halfway.
+  terminationGracePeriodSeconds: 720
   resources: {}
   podAnnotations: {}
   nodeSelector: {}

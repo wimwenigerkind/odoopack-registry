@@ -39,6 +39,7 @@ Non-secret settings live under `config` and are rendered into a `config.yaml` th
 | `web.autoscaling.enabled` | `false` | HPA for the web deployment |
 | `worker.replicaCount` | `1` | Worker replicas |
 | `worker.healthPort` | `6970` | Worker health endpoint port |
+| `worker.terminationGracePeriodSeconds` | `720` | Time a stopping worker gets to finish its running job; keep it above the 10 minute job timeout |
 | `migration.enabled` | `true` | Run migrations as a pre-upgrade Job; web skips auto-migrate |
 | `config.base_url` | `http://localhost` | Public base URL, must be set |
 | `config.instance.mode` | `public` | `public` or `private` |

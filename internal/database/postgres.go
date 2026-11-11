@@ -29,6 +29,9 @@ func Migrate(db *gorm.DB, cipher *crypto.Cipher) error {
 	if err := hashLegacyApiTokens(db); err != nil {
 		return fmt.Errorf("failed to hash legacy api tokens: %w", err)
 	}
+	if err := dedupeActiveSyncJobs(db); err != nil {
+		return fmt.Errorf("failed to dedupe sync jobs: %w", err)
+	}
 
 	err := db.AutoMigrate(
 		&models.User{},

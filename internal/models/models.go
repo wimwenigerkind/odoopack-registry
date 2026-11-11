@@ -84,16 +84,19 @@ const (
 	SyncJobFailed  SyncJobStatus = "failed"
 )
 
+// SyncJob allows one pending and one running job per addon: a push during a
+// running sync still queues a job, and the claim skips an addon that already
+// has a running one.
 type SyncJob struct {
 	Base
-	AddonID       uuid.UUID     `gorm:"type:uuid;not null;index" json:"addon_id"`
+	AddonID       uuid.UUID     `gorm:"type:uuid;not null;index;uniqueIndex:idx_sync_jobs_active,priority:1,where:status IN ('pending'\\,'running')" json:"addon_id"`
 	Name          string        `json:"name"`
 	GitURL        string        `json:"git_url"`
 	DefaultBranch string        `json:"default_branch"`
 	Subpath       string        `json:"subpath"`
 	Trigger       string        `json:"trigger"`
 	IntegrationID *uuid.UUID    `gorm:"type:uuid" json:"integration_id,omitempty"`
-	Status        SyncJobStatus `gorm:"not null;default:pending;index" json:"status"`
+	Status        SyncJobStatus `gorm:"not null;default:pending;index;uniqueIndex:idx_sync_jobs_active,priority:2" json:"status"`
 	Attempts      int           `gorm:"not null;default:0" json:"attempts"`
 	MaxAttempts   int           `gorm:"not null;default:3" json:"max_attempts"`
 	RunAfter      time.Time     `gorm:"index" json:"run_after"`

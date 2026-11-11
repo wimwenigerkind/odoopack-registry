@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestGitCommandDisablesRedirects(t *testing.T) {
-	cmd := gitCommand("", nil, "ls-remote", "https://git.example.com/acme/addons.git")
+	cmd := gitCommand(context.Background(), "", nil, "ls-remote", "https://git.example.com/acme/addons.git")
 	want := []string{"git", "-c", "http.followRedirects=false", "ls-remote", "https://git.example.com/acme/addons.git"}
 	if !slices.Equal(cmd.Args, want) {
 		t.Errorf("args %q, want %q", cmd.Args, want)
@@ -23,16 +24,17 @@ func TestGitCommandDisablesRedirects(t *testing.T) {
 func TestNetworkOperationsCheckTheRemote(t *testing.T) {
 	saved := checkRemote
 	var checked []string
-	checkRemote = func(url string) error {
+	checkRemote = func(_ context.Context, url string) error {
 		checked = append(checked, url)
 		return validate.ErrHostNotAllowed
 	}
 	t.Cleanup(func() { checkRemote = saved })
 
 	const url = "https://git.example.com/acme/addons.git"
-	_, lsErr := LsRemote(url, nil)
-	_, cloneErr := CloneAndZip(url, nil, "main", "r", "")
-	_, fetchErr := CloneAndZipAtSHA(url, nil, "0123456789abcdef0123456789abcdef01234567", "r", "")
+	ctx := context.Background()
+	_, lsErr := LsRemote(ctx, url, nil)
+	_, cloneErr := CloneAndZip(ctx, url, nil, "main", "r", "")
+	_, fetchErr := CloneAndZipAtSHA(ctx, url, nil, "0123456789abcdef0123456789abcdef01234567", "r", "")
 	for _, err := range []error{lsErr, cloneErr, fetchErr} {
 		if !errors.Is(err, validate.ErrHostNotAllowed) {
 			t.Errorf("err = %v, want ErrHostNotAllowed", err)
@@ -66,7 +68,7 @@ func TestRedirectIsNotFollowed(t *testing.T) {
 		"GIT_CONFIG_NOSYSTEM=1",
 		"GIT_CONFIG_GLOBAL=/dev/null",
 	}
-	if _, err := LsRemote(origin.URL+"/acme/addons.git", env); err == nil {
+	if _, err := LsRemote(context.Background(), origin.URL+"/acme/addons.git", env); err == nil {
 		t.Fatal("want an error from a redirecting remote")
 	}
 	if n := hits.Load(); n != 0 {

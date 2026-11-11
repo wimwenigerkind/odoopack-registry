@@ -1,6 +1,7 @@
 package git_test
 
 import (
+	"context"
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
@@ -62,9 +63,11 @@ func TestFailedCloneKeepsTokenOut(t *testing.T) {
 			seen = nil
 			mu.Unlock()
 
-			_, lsErr := git.LsRemote(remote.URL, env)
-			_, cloneErr := git.CloneAndZip(remote.URL, env, "main", "r", "")
-			_, fetchErr := git.CloneAndZipAtSHA(remote.URL, env, "0123456789abcdef0123456789abcdef01234567", "r", "")
+			ctx := context.Background()
+
+			_, lsErr := git.LsRemote(ctx, remote.URL, env)
+			_, cloneErr := git.CloneAndZip(ctx, remote.URL, env, "main", "r", "")
+			_, fetchErr := git.CloneAndZipAtSHA(ctx, remote.URL, env, "0123456789abcdef0123456789abcdef01234567", "r", "")
 			for _, err := range []error{lsErr, cloneErr, fetchErr} {
 				if err == nil {
 					t.Fatal("want an error from a forbidden remote")

@@ -207,7 +207,7 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 	}
 
 	rootDir := rootDirFor(addon.Name, addon.Subpath)
-	archive, err := git.CloneAndZipAtSHA(remote.URL, remote.Env, reference, rootDir, addon.Subpath)
+	archive, err := git.CloneAndZipAtSHA(ctx, remote.URL, remote.Env, reference, rootDir, addon.Subpath)
 	if err != nil {
 		slog.Warn("on-demand rebuild failed", "sha", reference, "err", auth.RedactURLCredentials(err.Error()))
 		problem(c, http.StatusNotFound, codeNotFound, "reference not found in git")

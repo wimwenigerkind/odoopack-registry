@@ -18,29 +18,26 @@ func NewAddonVersionRepository(db *gorm.DB) *AddonVersionRepository {
 	return &AddonVersionRepository{db: db}
 }
 
+// Upsert writes version under its natural key (addon_id, version) in one
+// statement, so two writers racing on the same version cannot both insert, and
+// loads the stored row, including its id, back into version. An empty storage
+// key, content hash or size keeps the stored one.
 func (r *AddonVersionRepository) Upsert(version *models.AddonVersion) error {
-	var existing models.AddonVersion
-	err := r.db.Where("addon_id = ? AND version = ?", version.AddonID, version.Version).First(&existing).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return r.db.Create(version).Error
-	}
-	if err != nil {
-		return err
-	}
-	existing.RefType = version.RefType
-	existing.RefValue = version.RefValue
-	existing.Status = version.Status
-	if version.StorageKey != "" {
-		existing.StorageKey = version.StorageKey
-	}
-	if version.ContentHash != "" {
-		existing.ContentHash = version.ContentHash
-	}
-	if version.SizeBytes != 0 {
-		existing.SizeBytes = version.SizeBytes
-	}
-	*version = existing
-	return r.db.Save(version).Error
+	return r.db.Clauses(
+		clause.OnConflict{
+			Columns: []clause.Column{{Name: "addon_id"}, {Name: "version"}},
+			DoUpdates: clause.Assignments(map[string]any{
+				"ref_type":     gorm.Expr("excluded.ref_type"),
+				"ref_value":    gorm.Expr("excluded.ref_value"),
+				"status":       gorm.Expr("excluded.status"),
+				"storage_key":  gorm.Expr("COALESCE(NULLIF(excluded.storage_key, ''), addon_versions.storage_key)"),
+				"content_hash": gorm.Expr("COALESCE(NULLIF(excluded.content_hash, ''), addon_versions.content_hash)"),
+				"size_bytes":   gorm.Expr("COALESCE(NULLIF(excluded.size_bytes, 0), addon_versions.size_bytes)"),
+				"updated_at":   gorm.Expr("excluded.updated_at"),
+			}),
+		},
+		clause.Returning{},
+	).Create(version).Error
 }
 
 func (r *AddonVersionRepository) Get(addonID uuid.UUID, version string) (*models.AddonVersion, error) {
