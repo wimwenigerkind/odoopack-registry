@@ -14,7 +14,7 @@ require (
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/spf13/viper v1.21.0
 	github.com/wimwenigerkind/odoo-manifest v0.0.0-20260901165831-fc817747335b
-	github.com/wimwenigerkind/odoopack-semver v0.0.0-20260827211541-1f15691b59d7
+	github.com/wimwenigerkind/odoopack-spec v0.1.0
 	github.com/wimwenigerkind/paginate v0.2.0
 	github.com/yuin/goldmark v1.8.7
 	golang.org/x/oauth2 v0.37.0
@@ -79,7 +79,6 @@ require (
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.2 // indirect
-	github.com/wimwenigerkind/odoopack-spec v0.1.0 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.9.2 // indirect
 	go.uber.org/atomic v1.12.0 // indirect
