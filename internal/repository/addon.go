@@ -120,11 +120,16 @@ type AddonSearch struct {
 	Series string
 }
 
-func (r *AddonRepository) VisibleQuery(userID *uuid.UUID, isAdmin bool, s AddonSearch) *gorm.DB {
+// VisibleQuery selects the addons the caller may read. mode is the instance
+// mode: a private instance shows nothing to an anonymous caller, not even
+// public addons, the same rule canReadAddon applies to a single addon.
+func (r *AddonRepository) VisibleQuery(userID *uuid.UUID, isAdmin bool, mode string, s AddonSearch) *gorm.DB {
 	db := r.db.Model(&models.Addon{}).Joins("Repo")
 
 	switch {
 	case isAdmin:
+	case userID == nil && mode == "private":
+		db = db.Where("FALSE")
 	case userID == nil:
 		db = db.Where("addons.visibility = ?", models.VisibilityPublic)
 	default:
@@ -168,8 +173,8 @@ func (r *AddonRepository) VisibleQuery(userID *uuid.UUID, isAdmin bool, s AddonS
 	return db
 }
 
-func (r *AddonRepository) VisibleReadyVersions(userID *uuid.UUID, isAdmin bool) ([]string, error) {
-	visibleIDs := r.VisibleQuery(userID, isAdmin, AddonSearch{}).Select("addons.id")
+func (r *AddonRepository) VisibleReadyVersions(userID *uuid.UUID, isAdmin bool, mode string) ([]string, error) {
+	visibleIDs := r.VisibleQuery(userID, isAdmin, mode, AddonSearch{}).Select("addons.id")
 	var versions []string
 	err := r.db.
 		Table("addon_versions AS av").
@@ -180,35 +185,15 @@ func (r *AddonRepository) VisibleReadyVersions(userID *uuid.UUID, isAdmin bool) 
 	return versions, err
 }
 
-func (r *AddonRepository) ListVisibleTo(userID *uuid.UUID, isAdmin bool, nameFilter string) ([]models.Addon, error) {
+func (r *AddonRepository) ListVisibleTo(userID *uuid.UUID, isAdmin bool, mode, nameFilter string) ([]models.Addon, error) {
 	var addons []models.Addon
-	q := r.db.
+	q := r.VisibleQuery(userID, isAdmin, mode, AddonSearch{}).
 		Preload("Versions").
 		Preload("Repo").
-		Preload("Repo.Owner").
-		Joins("Repo")
+		Preload("Repo.Owner")
 
 	if nameFilter != "" {
 		q = q.Where("addons.name = ?", nameFilter)
-	}
-
-	switch {
-	case isAdmin:
-	case userID == nil:
-		q = q.Where("addons.visibility = ?", models.VisibilityPublic)
-	default:
-		groupGrant := r.db.
-			Table("group_memberships AS gm").
-			Select("1").
-			Joins("JOIN group_addon_accesses gaa ON gaa.group_id = gm.group_id").
-			Where("gm.user_id = ?", *userID).
-			Where("gaa.addon_id = addons.id")
-
-		q = q.Where(
-			r.db.Where("addons.visibility = ?", models.VisibilityPublic).
-				Or(`"Repo".owner_id = ?`, *userID).
-				Or("EXISTS (?)", groupGrant),
-		)
 	}
 
 	err := q.Find(&addons).Error

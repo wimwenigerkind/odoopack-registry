@@ -30,6 +30,11 @@ func main() {
 	config.LoadConfig()
 	logger.Setup(viper.GetString("log.level"))
 
+	mode := viper.GetString("instance.mode")
+	if err := config.ValidateInstanceMode(mode); err != nil {
+		bootstrap.Fatal("config", err)
+	}
+
 	db, err := database.Connect(viper.GetString("database.dsn"))
 	if err != nil {
 		bootstrap.Fatal("database connect", err)
@@ -75,7 +80,6 @@ func main() {
 	}
 	defer sessionStore.Stop()
 
-	mode := viper.GetString("instance.mode")
 	baseURL := strings.TrimSpace(viper.GetString("base_url"))
 	if baseURL == "" {
 		bootstrap.Fatal("config", fmt.Errorf("base_url must be set"))

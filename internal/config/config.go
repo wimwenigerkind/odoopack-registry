@@ -14,7 +14,7 @@ func LoadConfig() {
 
 	viper.SetDefault("server_address", "0.0.0.0:6969")
 	viper.SetDefault("base_url", "http://localhost:6969")
-	viper.SetDefault("instance.mode", "public") // "public" or "private"
+	viper.SetDefault("instance.mode", "public")
 
 	viper.SetDefault("cors.allowed_origins", []string{})
 
@@ -50,4 +50,14 @@ func LoadConfig() {
 	if err := viper.ReadInConfig(); err != nil {
 		fmt.Println("no config file found, using defaults")
 	}
+}
+
+// ValidateInstanceMode accepts exactly "public" and "private". Anything else,
+// a typo or "Private" included, used to make the instance silently public.
+func ValidateInstanceMode(mode string) error {
+	switch mode {
+	case "public", "private":
+		return nil
+	}
+	return fmt.Errorf("instance.mode must be %q or %q, got %q", "public", "private", mode)
 }

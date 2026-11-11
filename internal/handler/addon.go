@@ -68,7 +68,7 @@ func (h *AddonHandler) Get(c *gin.Context) {
 	}
 	hideFromNonWriters(addon, canWriteAddon(c, addon, h.users))
 	annotateVersions(addon.Versions)
-	if visible, err := h.addons.ListVisibleTo(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), ""); err == nil {
+	if visible, err := h.addons.ListVisibleTo(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), h.mode, ""); err == nil {
 		allNames, _ := h.addons.ListAllNames()
 		resolveDepends(addon.Versions, visible, allNames)
 	}
@@ -98,7 +98,7 @@ func mustAddonPaginator() *paginate.Paginator {
 func (h *AddonHandler) List(c *gin.Context) {
 	uid, signedIn := middleware.CurrentUserID(c)
 	isAdmin := isCurrentUserAdmin(c, h.users)
-	q := h.addons.VisibleQuery(currentUserIDPtr(c), isAdmin, repository.AddonSearch{
+	q := h.addons.VisibleQuery(currentUserIDPtr(c), isAdmin, h.mode, repository.AddonSearch{
 		Query:  strings.TrimSpace(c.Query("q")),
 		Series: strings.TrimSpace(c.Query("series")),
 	}).
@@ -126,7 +126,7 @@ func (h *AddonHandler) List(c *gin.Context) {
 }
 
 func (h *AddonHandler) ListSeries(c *gin.Context) {
-	versions, err := h.addons.VisibleReadyVersions(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users))
+	versions, err := h.addons.VisibleReadyVersions(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), h.mode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return

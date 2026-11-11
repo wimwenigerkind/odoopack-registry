@@ -66,7 +66,7 @@ func (h *RegistryHandler) Get(c *gin.Context) {
 		return
 	}
 
-	if visible, err := h.addons.ListVisibleTo(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), ""); err == nil {
+	if visible, err := h.addons.ListVisibleTo(currentUserIDPtr(c), isCurrentUserAdmin(c, h.users), h.mode, ""); err == nil {
 		allNames, _ := h.addons.ListAllNames()
 		resolveDepends(addon.Versions, visible, allNames)
 	}
