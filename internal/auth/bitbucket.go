@@ -139,7 +139,7 @@ func fetchBitbucketUser(ctx context.Context, token string) (*bbUser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bitbucket user: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("bitbucket user: %s: %s", resp.Status, strings.TrimSpace(string(body)))
@@ -172,7 +172,7 @@ func fetchBitbucketPrimaryEmail(ctx context.Context, token string) (string, bool
 	if err != nil {
 		return "", false, fmt.Errorf("bitbucket emails: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", false, fmt.Errorf("bitbucket emails: %s", resp.Status)
 	}

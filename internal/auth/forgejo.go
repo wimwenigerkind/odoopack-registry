@@ -161,7 +161,7 @@ func (p *ForgejoProvider) fetchUser(ctx context.Context, token string) (*forgejo
 	if err != nil {
 		return nil, fmt.Errorf("forgejo user: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("forgejo user: %s: %s", resp.Status, strings.TrimSpace(string(body)))
@@ -190,7 +190,7 @@ func (p *ForgejoProvider) fetchPrimaryEmail(ctx context.Context, token string) (
 	if err != nil {
 		return "", false, fmt.Errorf("forgejo emails: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", false, fmt.Errorf("forgejo emails: %s", resp.Status)
 	}

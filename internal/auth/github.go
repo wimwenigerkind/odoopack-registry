@@ -140,7 +140,7 @@ func fetchGitHubUser(ctx context.Context, token string) (*ghUser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("github user: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("github user: %s: %s", resp.Status, strings.TrimSpace(string(body)))
@@ -169,7 +169,7 @@ func fetchGitHubPrimaryEmail(ctx context.Context, token string) (string, bool, e
 	if err != nil {
 		return "", false, fmt.Errorf("github emails: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", false, fmt.Errorf("github emails: %s", resp.Status)
 	}

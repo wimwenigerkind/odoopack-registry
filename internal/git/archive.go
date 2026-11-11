@@ -29,7 +29,7 @@ func CloneAndZip(url string, env []string, ref, rootDir, subpath string) (Archiv
 	if err != nil {
 		return ArchiveResult{}, err
 	}
-	defer os.RemoveAll(tmp)
+	defer func() { _ = os.RemoveAll(tmp) }()
 
 	src := filepath.Join(tmp, "src")
 	if err := runGit("", env, "clone", "--depth", "1", "--branch", ref, "--single-branch", url, src); err != nil {
@@ -51,7 +51,7 @@ func CloneAndZip(url string, env []string, ref, rootDir, subpath string) (Archiv
 	keep := false
 	defer func() {
 		if !keep {
-			os.Remove(outName)
+			_ = os.Remove(outName)
 		}
 	}()
 
@@ -90,7 +90,7 @@ func CloneAndZipAtSHA(url string, env []string, sha, rootDir, subpath string) (A
 	if err != nil {
 		return ArchiveResult{}, err
 	}
-	defer os.RemoveAll(tmp)
+	defer func() { _ = os.RemoveAll(tmp) }()
 
 	src := filepath.Join(tmp, "src")
 	if err := os.MkdirAll(src, 0o755); err != nil {
@@ -123,7 +123,7 @@ func CloneAndZipAtSHA(url string, env []string, sha, rootDir, subpath string) (A
 	keep := false
 	defer func() {
 		if !keep {
-			os.Remove(outName)
+			_ = os.Remove(outName)
 		}
 	}()
 
@@ -249,7 +249,7 @@ func sha256File(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err

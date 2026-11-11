@@ -48,9 +48,11 @@ func (s *LocalStorage) Put(_ context.Context, key string, r io.Reader, _ PutOpti
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	_, err = io.Copy(f, r)
-	return err
+	if _, err := io.Copy(f, r); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 func (s *LocalStorage) Get(_ context.Context, key string) (io.ReadCloser, error) {

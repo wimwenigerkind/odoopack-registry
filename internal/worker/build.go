@@ -204,7 +204,7 @@ func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, remote 
 		}
 		if existing.Status == models.StatusReady && existing.RefValue == d.Ref.SHA {
 			if rc, err := c.storage.Get(ctx, existing.StorageKey); err == nil {
-				rc.Close()
+				_ = rc.Close()
 				return nil
 			}
 			slog.Warn("artifact missing, rebuilding", "addon", job.Name, "version", d.Version, "storage_key", existing.StorageKey)
@@ -228,14 +228,14 @@ func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, remote 
 		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
 		return err
 	}
-	defer os.Remove(archive.ZipPath)
+	defer func() { _ = os.Remove(archive.ZipPath) }()
 
 	f, err := os.Open(archive.ZipPath)
 	if err != nil {
 		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	keyName := strings.ReplaceAll(d.Version+"-"+d.Ref.SHA, "/", "-")
 	key := fmt.Sprintf("packages/%s/%s.zip", job.AddonID, keyName)

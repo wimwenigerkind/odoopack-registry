@@ -213,7 +213,7 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 		problem(c, http.StatusNotFound, codeNotFound, "reference not found in git")
 		return
 	}
-	defer os.Remove(archive.ZipPath)
+	defer func() { _ = os.Remove(archive.ZipPath) }()
 
 	gotHash := "sha256:" + archive.ContentHash
 	if expected := expectedContentHash(addon.Versions, reference); expected != "" && gotHash != expected {
@@ -225,7 +225,7 @@ func (h *RegistryHandler) Zipball(c *gin.Context) {
 
 	if f, err := os.Open(archive.ZipPath); err == nil {
 		_ = h.storage.Put(ctx, pinnedKey, f, storage.PutOptions{ContentType: "application/zip"})
-		f.Close()
+		_ = f.Close()
 	}
 
 	f, err := os.Open(archive.ZipPath)
@@ -266,7 +266,7 @@ func rootDirFor(name, subpath string) string {
 }
 
 func streamZip(c *gin.Context, rc io.ReadCloser, name, version, reference string) {
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 	short := reference
 	if len(short) > 12 {
 		short = short[:12]

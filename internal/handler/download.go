@@ -72,7 +72,7 @@ func (h *DownloadHandler) Zipball(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 		return
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	filename := strings.ReplaceAll(addon.Name, "/", "_") + "-" + strings.ReplaceAll(version, "/", "_") + ".zip"
 	c.Header("Content-Type", "application/zip")
