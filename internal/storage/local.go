@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -41,18 +42,60 @@ func (s *LocalStorage) Put(_ context.Context, key string, r io.Reader, _ PutOpti
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	f, err := os.Create(path)
+	// Readers may open the key while a Put runs, so the content goes to a
+	// temp file first and only a rename makes it visible. The pattern starts
+	// with a dot and ends in .tmp, which no key the registry builds does.
+	f, err := os.CreateTemp(dir, "."+filepath.Base(path)+".*.tmp")
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(f, r); err != nil {
-		_ = f.Close()
+	tmp := f.Name()
+	if err := writeFile(f, r); err != nil {
+		_ = os.Remove(tmp)
 		return err
 	}
-	return f.Close()
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return syncDir(dir)
+}
+
+func writeFile(f *os.File, r io.Reader) error {
+	_, err := io.Copy(f, r)
+	// CreateTemp creates 0600; 0644 is what os.Create gave under the usual
+	// umask of 022, so objects stay readable by other users as before.
+	if err == nil {
+		err = f.Chmod(0644)
+	}
+	if err == nil {
+		err = f.Sync()
+	}
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	return err
+}
+
+// syncDir makes the rename itself survive a crash. Windows cannot sync a
+// directory handle, so it is skipped there.
+func syncDir(dir string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	if err := d.Sync(); err != nil {
+		_ = d.Close()
+		return err
+	}
+	return d.Close()
 }
 
 func (s *LocalStorage) Get(_ context.Context, key string) (io.ReadCloser, error) {
