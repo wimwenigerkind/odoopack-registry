@@ -18,21 +18,24 @@ func NewAddonVersionRepository(db *gorm.DB) *AddonVersionRepository {
 	return &AddonVersionRepository{db: db}
 }
 
-// Upsert writes version under its natural key (addon_id, version) in one
-// statement, so two writers racing on the same version cannot both insert, and
-// loads the stored row, including its id, back into version. An empty storage
-// key, content hash or size keeps the stored one.
-func (r *AddonVersionRepository) Upsert(version *models.AddonVersion) error {
+// StartBuild records a build of version at its RefValue under the natural key
+// (addon_id, version) in one statement, so two writers racing on the same
+// version cannot both insert, and loads the stored row, including its id, back
+// into version. The commit goes to building_ref. A version that is already
+// ready keeps its status, ref and artifact, so it stays listed and
+// installable at its last good build until SetReady swaps in the new one;
+// any other version goes to building at the new ref.
+func (r *AddonVersionRepository) StartBuild(version *models.AddonVersion) error {
+	version.Status = models.StatusBuilding
+	version.BuildingRef = version.RefValue
 	return r.db.Clauses(
 		clause.OnConflict{
 			Columns: []clause.Column{{Name: "addon_id"}, {Name: "version"}},
 			DoUpdates: clause.Assignments(map[string]any{
 				"ref_type":     gorm.Expr("excluded.ref_type"),
-				"ref_value":    gorm.Expr("excluded.ref_value"),
-				"status":       gorm.Expr("excluded.status"),
-				"storage_key":  gorm.Expr("COALESCE(NULLIF(excluded.storage_key, ''), addon_versions.storage_key)"),
-				"content_hash": gorm.Expr("COALESCE(NULLIF(excluded.content_hash, ''), addon_versions.content_hash)"),
-				"size_bytes":   gorm.Expr("COALESCE(NULLIF(excluded.size_bytes, 0), addon_versions.size_bytes)"),
+				"ref_value":    gorm.Expr("CASE WHEN addon_versions.status = ? THEN addon_versions.ref_value ELSE excluded.ref_value END", models.StatusReady),
+				"status":       gorm.Expr("CASE WHEN addon_versions.status = ? THEN addon_versions.status ELSE excluded.status END", models.StatusReady),
+				"building_ref": gorm.Expr("excluded.building_ref"),
 				"updated_at":   gorm.Expr("excluded.updated_at"),
 			}),
 		},
@@ -52,10 +55,13 @@ func (r *AddonVersionRepository) Get(addonID uuid.UUID, version string) (*models
 	return &av, nil
 }
 
-func (r *AddonVersionRepository) UpdateStatus(id uuid.UUID, status models.VersionStatus, buildErr string) error {
+// FailBuild ends the build in progress with buildErr. A ready version stays
+// ready at its last good build and only carries the error of the rebuild.
+func (r *AddonVersionRepository) FailBuild(id uuid.UUID, buildErr string) error {
 	return r.db.Model(&models.AddonVersion{}).Where("id = ?", id).Updates(map[string]any{
-		"status":      status,
-		"build_error": buildErr,
+		"status":       gorm.Expr("CASE WHEN status = ? THEN status ELSE ? END", models.StatusReady, models.StatusFailed),
+		"build_error":  buildErr,
+		"building_ref": "",
 	}).Error
 }
 
@@ -112,28 +118,40 @@ type ManifestMeta struct {
 	Website         string
 }
 
-func (r *AddonVersionRepository) SetManifestMeta(id uuid.UUID, meta ManifestMeta) error {
-	return r.db.Model(&models.AddonVersion{}).Where("id = ?", id).
-		Select("depends", "manifest_version", "summary", "license", "category", "author", "website").
-		Updates(models.AddonVersion{
-			Depends:         meta.Depends,
-			ManifestVersion: meta.ManifestVersion,
-			Summary:         meta.Summary,
-			License:         meta.License,
-			Category:        meta.Category,
-			Author:          meta.Author,
-			Website:         meta.Website,
-		}).Error
+type Build struct {
+	RefValue    string
+	StorageKey  string
+	ContentHash string
+	SizeBytes   int64
+	// Manifest is nil when the archive has no manifest; the stored metadata
+	// is kept then.
+	Manifest *ManifestMeta
 }
 
-func (r *AddonVersionRepository) SetReady(id uuid.UUID, storageKey, contentHash string, sizeBytes int64) error {
+// SetReady publishes b in one UPDATE, so a client sees either the previous
+// build or the new one, never the hash of one with the ref or depends of the
+// other.
+func (r *AddonVersionRepository) SetReady(id uuid.UUID, b Build) error {
 	now := time.Now()
-	return r.db.Model(&models.AddonVersion{}).Where("id = ?", id).Updates(map[string]any{
-		"status":       models.StatusReady,
-		"storage_key":  storageKey,
-		"content_hash": contentHash,
-		"size_bytes":   sizeBytes,
-		"built_at":     now,
-		"build_error":  "",
-	}).Error
+	columns := []string{"status", "ref_value", "storage_key", "content_hash", "size_bytes", "built_at", "build_error", "building_ref", "updated_at"}
+	values := models.AddonVersion{
+		Base:        models.Base{UpdatedAt: now},
+		Status:      models.StatusReady,
+		RefValue:    b.RefValue,
+		StorageKey:  b.StorageKey,
+		ContentHash: b.ContentHash,
+		SizeBytes:   b.SizeBytes,
+		BuiltAt:     &now,
+	}
+	if m := b.Manifest; m != nil {
+		columns = append(columns, "depends", "manifest_version", "summary", "license", "category", "author", "website")
+		values.Depends = m.Depends
+		values.ManifestVersion = m.ManifestVersion
+		values.Summary = m.Summary
+		values.License = m.License
+		values.Category = m.Category
+		values.Author = m.Author
+		values.Website = m.Website
+	}
+	return r.db.Model(&models.AddonVersion{}).Where("id = ?", id).Select(columns).Updates(values).Error
 }

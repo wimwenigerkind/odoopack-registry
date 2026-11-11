@@ -13,9 +13,9 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
 )
 
-// Two writers marking the same version must end with one row that both of
-// them hold the id of.
-func TestUpsertConcurrentWritersShareOneRow(t *testing.T) {
+// Two writers starting a build of the same version must end with one row that
+// both of them hold the id of, and a ready version keeps its last good build.
+func TestStartBuildConcurrentWritersShareOneRow(t *testing.T) {
 	dsn := os.Getenv("TEST_DATABASE_DSN")
 	if dsn == "" {
 		t.Skip("TEST_DATABASE_DSN not set")
@@ -43,7 +43,7 @@ func TestUpsertConcurrentWritersShareOneRow(t *testing.T) {
 
 	ready := &models.AddonVersion{AddonID: addon.ID, Version: "dev-main", RefType: models.RefTypeBranch,
 		RefValue: "old", Status: models.StatusReady, StorageKey: "packages/old.zip", SizeBytes: 42}
-	if err := versions.Upsert(ready); err != nil {
+	if err := db.Create(ready).Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -52,8 +52,8 @@ func TestUpsertConcurrentWritersShareOneRow(t *testing.T) {
 	for i := range ids {
 		wg.Go(func() {
 			av := &models.AddonVersion{AddonID: addon.ID, Version: "dev-main", RefType: models.RefTypeBranch,
-				RefValue: "new", Status: models.StatusBuilding}
-			if err := versions.Upsert(av); err != nil {
+				RefValue: "new"}
+			if err := versions.StartBuild(av); err != nil {
 				t.Error(err)
 			}
 			ids[i] = av.ID
@@ -74,7 +74,7 @@ func TestUpsertConcurrentWritersShareOneRow(t *testing.T) {
 		t.Fatalf("rows = %d, want 1", len(rows))
 	}
 	got := rows[0]
-	if got.Status != models.StatusBuilding || got.RefValue != "new" || got.StorageKey != "packages/old.zip" || got.SizeBytes != 42 {
-		t.Errorf("row = %s %s %q %d, want building at new keeping the stored artifact", got.Status, got.RefValue, got.StorageKey, got.SizeBytes)
+	if got.Status != models.StatusReady || got.RefValue != "old" || got.BuildingRef != "new" || got.StorageKey != "packages/old.zip" || got.SizeBytes != 42 {
+		t.Errorf("row = %s %s building %q %q %d, want ready at old building new", got.Status, got.RefValue, got.BuildingRef, got.StorageKey, got.SizeBytes)
 	}
 }

@@ -19,6 +19,8 @@ func addonWithWriterFields() *models.Addon {
 		},
 		Versions: []models.AddonVersion{
 			{Version: "1.0.0", Status: models.StatusFailed, BuildError: "git clone failed"},
+			// A failed rebuild leaves the version ready with the rebuild's error.
+			{Version: "dev-main", Status: models.StatusReady, BuildError: "rebuild failed"},
 		},
 	}
 }
@@ -44,7 +46,7 @@ func TestHideFromNonWriters(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, field := range []string{`"build_error":"git clone failed"`, `"integration_id"`, `"account_name":"acme"`} {
+		for _, field := range []string{`"build_error":"git clone failed"`, `"build_error":"rebuild failed"`, `"integration_id"`, `"account_name":"acme"`} {
 			if !strings.Contains(string(body), field) {
 				t.Errorf("response lacks %s: %s", field, body)
 			}

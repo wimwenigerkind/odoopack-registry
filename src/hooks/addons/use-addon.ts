@@ -13,7 +13,8 @@ export function useAddon(id: string) {
       const addon = query.state.data
       if (!addon?.versions?.length) return false
       const hasInProgress = addon.versions.some(
-        (v) => v.status === "pending" || v.status === "building",
+        (v) =>
+          v.status === "pending" || v.status === "building" || !!v.building_ref,
       )
       return hasInProgress ? 2000 : false
     },

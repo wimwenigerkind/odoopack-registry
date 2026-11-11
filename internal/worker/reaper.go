@@ -43,12 +43,14 @@ func (c *Consumer) reapLoop(ctx context.Context) {
 	}
 }
 
-// reap returns jobs whose worker died to pending and fails the versions those
-// workers left in building. It is one statement whose stale rows are locked
-// with SKIP LOCKED, so replicas reaping at the same time never handle a job
-// twice. A reaped job counts as an attempt, so one that keeps killing its
-// worker ends as failed. When a newer pending job exists for the addon, the
-// stale one is deleted instead, since only one pending job per addon may exist.
+// reap returns jobs whose worker died to pending and fails the builds those
+// workers left unfinished: a version in building goes to failed, a ready one
+// keeps its last good build and only records the error. It is one statement
+// whose stale rows are locked with SKIP LOCKED, so replicas reaping at the
+// same time never handle a job twice. A reaped job counts as an attempt, so
+// one that keeps killing its worker ends as failed. When a newer pending job
+// exists for the addon, the stale one is deleted instead, since only one
+// pending job per addon may exist.
 func reap(ctx context.Context, db *gorm.DB) (jobs, versions int64, err error) {
 	err = db.WithContext(ctx).Raw(`
 WITH stale AS (
@@ -77,8 +79,12 @@ dropped AS (
 	RETURNING j.addon_id
 ),
 failed AS (
-	UPDATE addon_versions SET status = @version_failed, build_error = @build_error, updated_at = now()
-	WHERE status = @building
+	UPDATE addon_versions SET
+		status = CASE WHEN status = @building THEN @version_failed ELSE status END,
+		build_error = @build_error,
+		building_ref = '',
+		updated_at = now()
+	WHERE (status = @building OR building_ref <> '')
 	AND addon_id IN (SELECT addon_id FROM requeued UNION ALL SELECT addon_id FROM dropped)
 	RETURNING 1
 )

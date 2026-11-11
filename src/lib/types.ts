@@ -102,6 +102,7 @@ export interface AddonVersion {
   content_hash?: string
   size_bytes?: number
   build_error?: string
+  building_ref?: string
   built_at?: string | null
   depends?: string[]
   depends_resolved?: ResolvedDep[]

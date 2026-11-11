@@ -175,14 +175,18 @@ func TestReapRequeuesStaleJob(t *testing.T) {
 		}
 	}
 	versionRepo := repository.NewAddonVersionRepository(db)
+	const sha, rebuildSHA = "0123456789abcdef0123456789abcdef01234567", "89abcdef0123456789abcdef0123456789abcdef"
 	for _, v := range []models.AddonVersion{
-		{AddonID: stale.ID, Version: "dev-main", Status: models.StatusBuilding},
+		{AddonID: stale.ID, Version: "dev-main", Status: models.StatusBuilding, BuildingRef: sha},
+		{AddonID: stale.ID, Version: "dev-legacy", Status: models.StatusBuilding},
+		{AddonID: stale.ID, Version: "dev-rebuild", Status: models.StatusReady, ContentHash: "sha256:old", BuildingRef: rebuildSHA},
 		{AddonID: stale.ID, Version: "19.0.1.0.0", Status: models.StatusReady},
-		{AddonID: superseded.ID, Version: "dev-main", Status: models.StatusBuilding},
-		{AddonID: live.ID, Version: "dev-main", Status: models.StatusBuilding},
+		{AddonID: superseded.ID, Version: "dev-main", Status: models.StatusBuilding, BuildingRef: sha},
+		{AddonID: live.ID, Version: "dev-main", Status: models.StatusBuilding, BuildingRef: sha},
+		{AddonID: live.ID, Version: "dev-rebuild", Status: models.StatusReady, BuildingRef: rebuildSHA},
 	} {
-		v.RefType, v.RefValue = models.RefTypeBranch, "0123456789abcdef0123456789abcdef01234567"
-		if err := versionRepo.Upsert(&v); err != nil {
+		v.RefType, v.RefValue = models.RefTypeBranch, sha
+		if err := db.Create(&v).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -191,8 +195,8 @@ func TestReapRequeuesStaleJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if jobs != 2 || versions != 2 {
-		t.Errorf("reaped %d jobs and %d versions, want 2 and 2", jobs, versions)
+	if jobs != 2 || versions != 4 {
+		t.Errorf("reaped %d jobs and %d versions, want 2 and 4", jobs, versions)
 	}
 
 	var job models.SyncJob
@@ -209,25 +213,33 @@ func TestReapRequeuesStaleJob(t *testing.T) {
 		t.Errorf("live addon has %d running jobs, want 1", n)
 	}
 
+	// A hung rebuild of a ready version keeps the good build and only records
+	// the error.
 	for _, tc := range []struct {
-		addon   uuid.UUID
-		version string
-		status  models.VersionStatus
+		addon       uuid.UUID
+		version     string
+		status      models.VersionStatus
+		buildingRef string
+		buildErr    string
 	}{
-		{stale.ID, "dev-main", models.StatusFailed},
-		{stale.ID, "19.0.1.0.0", models.StatusReady},
-		{superseded.ID, "dev-main", models.StatusFailed},
-		{live.ID, "dev-main", models.StatusBuilding},
+		{stale.ID, "dev-main", models.StatusFailed, "", staleBuildErr},
+		{stale.ID, "dev-legacy", models.StatusFailed, "", staleBuildErr},
+		{stale.ID, "dev-rebuild", models.StatusReady, "", staleBuildErr},
+		{stale.ID, "19.0.1.0.0", models.StatusReady, "", ""},
+		{superseded.ID, "dev-main", models.StatusFailed, "", staleBuildErr},
+		{live.ID, "dev-main", models.StatusBuilding, sha, ""},
+		{live.ID, "dev-rebuild", models.StatusReady, rebuildSHA, ""},
 	} {
 		v, err := versionRepo.Get(tc.addon, tc.version)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if v.Status != tc.status {
-			t.Errorf("%s status = %s, want %s", tc.version, v.Status, tc.status)
+		if v.Status != tc.status || v.BuildingRef != tc.buildingRef || v.BuildError != tc.buildErr {
+			t.Errorf("%s = %s building %q error %q, want %s building %q error %q",
+				tc.version, v.Status, v.BuildingRef, v.BuildError, tc.status, tc.buildingRef, tc.buildErr)
 		}
-		if tc.status == models.StatusFailed && v.BuildError != staleBuildErr {
-			t.Errorf("build_error = %q, want %q", v.BuildError, staleBuildErr)
+		if tc.version == "dev-rebuild" && (v.RefValue != sha || (tc.addon == stale.ID && v.ContentHash != "sha256:old")) {
+			t.Errorf("%s moved to %s %s, want the good build", tc.version, v.RefValue, v.ContentHash)
 		}
 	}
 

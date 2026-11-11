@@ -50,6 +50,7 @@ type AddonVersion struct {
 	ContentHash     string        `json:"content_hash,omitempty"`
 	SizeBytes       int64         `json:"size_bytes,omitempty"`
 	BuildError      string        `json:"build_error,omitempty"`
+	BuildingRef     string        `json:"building_ref,omitempty"`
 	BuiltAt         *time.Time    `json:"built_at,omitempty"`
 	Depends         []string      `gorm:"serializer:json" json:"depends,omitempty"`
 	ManifestVersion string        `json:"manifest_version,omitempty"`

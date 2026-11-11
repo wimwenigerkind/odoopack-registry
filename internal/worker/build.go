@@ -289,23 +289,22 @@ func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, remote 
 		Version:  d.Version,
 		RefType:  refType,
 		RefValue: d.Ref.SHA,
-		Status:   models.StatusBuilding,
 	}
-	if err := c.versionRepo.Upsert(av); err != nil {
+	if err := c.versionRepo.StartBuild(av); err != nil {
 		return fmt.Errorf("mark building: %w", err)
 	}
 
 	rootDir := name.ModuleName(job.Name)
 	archive, err := c.cloneAndZip(ctx, remote.URL, remote.Env, d.Ref.Name, rootDir, job.Subpath)
 	if err != nil {
-		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
+		_ = c.versionRepo.FailBuild(av.ID, auth.RedactURLCredentials(err.Error()))
 		return err
 	}
 	defer func() { _ = os.Remove(archive.ZipPath) }()
 
 	f, err := os.Open(archive.ZipPath)
 	if err != nil {
-		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
+		_ = c.versionRepo.FailBuild(av.ID, auth.RedactURLCredentials(err.Error()))
 		return err
 	}
 	defer func() { _ = f.Close() }()
@@ -313,26 +312,29 @@ func (c *Consumer) buildVersion(ctx context.Context, job models.SyncJob, remote 
 	keyName := strings.ReplaceAll(d.Version+"-"+d.Ref.SHA, "/", "-")
 	key := fmt.Sprintf("packages/%s/%s.zip", job.AddonID, keyName)
 	if err := c.storage.Put(ctx, key, f, storage.PutOptions{ContentType: "application/zip"}); err != nil {
-		_ = c.versionRepo.UpdateStatus(av.ID, models.StatusFailed, auth.RedactURLCredentials(err.Error()))
+		_ = c.versionRepo.FailBuild(av.ID, auth.RedactURLCredentials(err.Error()))
 		return err
 	}
 
-	if err := c.versionRepo.SetReady(av.ID, key, "sha256:"+archive.ContentHash, archive.SizeBytes); err != nil {
-		return fmt.Errorf("mark ready: %w", err)
+	build := repository.Build{
+		RefValue:    d.Ref.SHA,
+		StorageKey:  key,
+		ContentHash: "sha256:" + archive.ContentHash,
+		SizeBytes:   archive.SizeBytes,
 	}
-
-	if archive.Manifest != nil {
-		if err := c.versionRepo.SetManifestMeta(av.ID, repository.ManifestMeta{
-			Depends:         archive.Manifest.Depends,
-			ManifestVersion: archive.Manifest.Version,
-			Summary:         archive.Manifest.Summary,
-			License:         archive.Manifest.License,
-			Category:        archive.Manifest.Category,
-			Author:          archive.Manifest.Author,
-			Website:         archive.Manifest.Website,
-		}); err != nil {
-			slog.Warn("store manifest meta", "addon", job.Name, "version", d.Version, "err", err)
+	if m := archive.Manifest; m != nil {
+		build.Manifest = &repository.ManifestMeta{
+			Depends:         m.Depends,
+			ManifestVersion: m.Version,
+			Summary:         m.Summary,
+			License:         m.License,
+			Category:        m.Category,
+			Author:          m.Author,
+			Website:         m.Website,
 		}
+	}
+	if err := c.versionRepo.SetReady(av.ID, build); err != nil {
+		return fmt.Errorf("mark ready: %w", err)
 	}
 
 	html, err := markdown.Render(archive.Readme)
