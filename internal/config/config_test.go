@@ -1,6 +1,10 @@
 package config
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/spf13/viper"
+)
 
 func TestValidateInstanceMode(t *testing.T) {
 	for _, tc := range []struct {
@@ -46,6 +50,39 @@ func TestCookieSecure(t *testing.T) {
 			secure, insecure := CookieSecure(tc.baseURL, tc.explicit)
 			if secure != tc.wantSecure || insecure != tc.wantInsecure {
 				t.Errorf("CookieSecure(%q) = (%v, %v), want (%v, %v)", tc.baseURL, secure, insecure, tc.wantSecure, tc.wantInsecure)
+			}
+		})
+	}
+}
+
+func TestAutoMigrate(t *testing.T) {
+	cases := []struct {
+		name        string
+		autoMigrate any
+		env         string
+		devMode     bool
+		want        bool
+	}{
+		{"unset, production", nil, "", false, false},
+		{"unset, dev mode", nil, "", true, true},
+		{"explicit false wins over dev mode", false, "", true, false},
+		{"explicit true without dev mode", true, "", false, true},
+		{"env false wins over dev mode", nil, "false", true, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			viper.AutomaticEnv()
+			viper.Set("dev_mode", tc.devMode)
+			if tc.autoMigrate != nil {
+				viper.Set("auto_migrate", tc.autoMigrate)
+			}
+			if tc.env != "" {
+				t.Setenv("AUTO_MIGRATE", tc.env)
+			}
+			if got := AutoMigrate(); got != tc.want {
+				t.Errorf("AutoMigrate() = %v, want %v", got, tc.want)
 			}
 		})
 	}

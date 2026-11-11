@@ -40,9 +40,7 @@ func LoadConfig() {
 	viper.SetDefault("dev_mode", false)
 	viper.SetDefault("redis.url", "redis://localhost:6379/0")
 
-	// Deployments run the migrate binary before the web pods start;
-	// auto_migrate is for local development.
-	viper.SetDefault("auto_migrate", false)
+	// auto_migrate has no default on purpose: AutoMigrate tells unset from false.
 
 	viper.SetDefault("worker.count", 2)
 	viper.SetDefault("worker.poll_interval", "2s")
@@ -76,6 +74,16 @@ func ValidateInstanceMode(mode string) error {
 // Unset, it follows the scheme of baseURL, so an https deployment cannot ship
 // cookies a plain http hop would leak. insecure reports an explicit false on an
 // https baseURL, which the caller should warn about.
+// AutoMigrate reports whether the web binary migrates on start. Deployments
+// run the migrate binary before the web pods start, so it is off unless set;
+// in dev_mode it follows dev_mode, so a local setup needs no separate run.
+func AutoMigrate() bool {
+	if viper.IsSet("auto_migrate") {
+		return viper.GetBool("auto_migrate")
+	}
+	return viper.GetBool("dev_mode")
+}
+
 func CookieSecure(baseURL string, explicit *bool) (secure, insecure bool) {
 	https := false
 	if u, err := url.Parse(baseURL); err == nil {

@@ -59,7 +59,7 @@ func main() {
 	if err != nil {
 		bootstrap.Fatal("database connect", err)
 	}
-	if viper.GetBool("auto_migrate") {
+	if config.AutoMigrate() {
 		if err := database.Migrate(db, cipher); err != nil {
 			bootstrap.Fatal("database migrate", err)
 		}
