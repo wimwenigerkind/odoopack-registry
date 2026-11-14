@@ -13,7 +13,7 @@ require (
 	github.com/pb33f/libopenapi-validator v0.16.2
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/spf13/viper v1.21.0
-	github.com/wimwenigerkind/odoo-manifest v0.0.0-20260901165831-fc817747335b
+	github.com/wimwenigerkind/odoo-manifest v0.1.0
 	github.com/wimwenigerkind/odoopack-spec v0.1.0
 	github.com/wimwenigerkind/paginate v0.2.0
 	github.com/yuin/goldmark v1.8.7
