@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -19,26 +18,14 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/git"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
+	"github.com/wimwenigerkind/odoopack-registry/internal/testdb"
 	"gorm.io/gorm"
 )
 
-// testDB needs a disposable Postgres database in TEST_DATABASE_DSN; the tests
-// empty sync_jobs and addon_versions there. Packages with integration tests
-// share that database, so run them one at a time: go test -p 1 -tags integration.
 func testDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_DSN")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_DSN not set")
-	}
-	db, err := database.Connect(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := testdb.Open(t, database.Connect)
 	if err := database.Migrate(db, nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Exec("TRUNCATE sync_jobs, addon_versions").Error; err != nil {
 		t.Fatal(err)
 	}
 	return db

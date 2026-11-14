@@ -4,8 +4,8 @@ package database
 
 import (
 	"context"
+	"errors"
 	"log/slog"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -15,26 +15,8 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/crypto"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
-	"gorm.io/gorm"
+	"github.com/wimwenigerkind/odoopack-registry/internal/testdb"
 )
-
-// freshDB connects to TEST_DATABASE_DSN and empties the public schema, so the
-// next migration starts from nothing.
-func freshDB(t *testing.T) (*gorm.DB, string) {
-	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_DSN")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_DSN not set")
-	}
-	db, err := Connect(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Exec("DROP SCHEMA public CASCADE; CREATE SCHEMA public").Error; err != nil {
-		t.Fatal(err)
-	}
-	return db, dsn
-}
 
 // countingHandler counts log records by message.
 type countingHandler struct {
@@ -72,7 +54,14 @@ func captureLogs(t *testing.T) *countingHandler {
 // The sealing step logs only when it sealed something; without the lock every
 // run would read the plaintext tokens before the first commit and seal again.
 func TestMigrateConcurrently(t *testing.T) {
-	db, dsn := freshDB(t)
+	dsn := testdb.DSN(t)
+	db, err := Connect(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sqlDB, err := db.DB(); err == nil {
+		defer func() { _ = sqlDB.Close() }()
+	}
 	c := testCipher(t, 1)
 
 	if err := db.AutoMigrate(&legacyApiToken{}, &models.OAuthIntegration{}); err != nil {
@@ -152,7 +141,7 @@ func TestMigrateConcurrently(t *testing.T) {
 // Migrate waits for a lock somebody else holds, and SchemaReady reports false
 // while the schema is missing or a migration holds the lock.
 func TestMigrateWaitsForTheLock(t *testing.T) {
-	db, _ := freshDB(t)
+	db := testDB(t)
 	ctx := context.Background()
 
 	sqlDB, err := db.DB()
@@ -195,26 +184,44 @@ func TestMigrateWaitsForTheLock(t *testing.T) {
 		t.Fatal("Migrate did not finish after the lock was released")
 	}
 
-	if ready, err := SchemaReady(ctx, db); err != nil || !ready {
-		t.Fatalf("SchemaReady after migrating = %v, %v; want true", ready, err)
+	if err := eventually(func() (bool, error) { return SchemaReady(ctx, db) }); err != nil {
+		t.Fatalf("SchemaReady after migrating: %v", err)
 	}
 
-	// Migrate released its lock: another session can take it right away.
-	var free bool
-	if err := holder.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", migrationLockKey).Scan(&free); err != nil {
-		t.Fatal(err)
-	}
-	if !free {
-		t.Error("the migration lock is still held after Migrate returned")
+	// Migrate released its lock: another session can take it. A lock left on
+	// one of db's pooled connections would stay held for good.
+	err = eventually(func() (free bool, err error) {
+		err = holder.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", migrationLockKey).Scan(&free)
+		return free, err
+	})
+	if err != nil {
+		t.Errorf("the migration lock is still held after Migrate returned: %v", err)
 	}
 	if _, err := holder.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", migrationLockKey); err != nil {
 		t.Fatal(err)
 	}
 }
 
+// eventually retries cond until it holds. The integration tests of other
+// packages, run in parallel, migrate their own schemas under the same advisory
+// lock, so a check that needs the lock free may find it taken for a moment.
+func eventually(cond func() (bool, error)) error {
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		ok, err := cond()
+		if ok || err != nil {
+			return err
+		}
+		if time.Now().After(deadline) {
+			return errors.New("condition not met within 30s")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 // WaitForSchema returns once the schema exists and stops with its context.
 func TestWaitForSchema(t *testing.T) {
-	db, _ := freshDB(t)
+	db := testDB(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
@@ -232,7 +239,9 @@ func TestWaitForSchema(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(10 * time.Second):
+	// WaitForSchema backs off between checks, and a check that finds another
+	// package's migration holding the lock waits for the next one.
+	case <-time.After(20 * time.Second):
 		t.Fatal("WaitForSchema did not return after the migration")
 	}
 }

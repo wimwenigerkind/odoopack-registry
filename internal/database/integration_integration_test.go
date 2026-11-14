@@ -4,7 +4,6 @@ package database
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -14,22 +13,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// integrationTestDB needs a disposable Postgres database in
-// TEST_DATABASE_DSN; the tests drop and recreate the integration and repo
-// tables there.
 func integrationTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_DSN")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_DSN not set")
-	}
-	db, err := Connect(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Migrator().DropTable(&models.Repo{}, &models.OAuthIntegration{}); err != nil {
-		t.Fatal(err)
-	}
+	db := testDB(t)
 	if err := Migrate(db, nil); err != nil {
 		t.Fatal(err)
 	}

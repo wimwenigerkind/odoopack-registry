@@ -4,7 +4,6 @@ package handler
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/database"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
+	"github.com/wimwenigerkind/odoopack-registry/internal/testdb"
 	"github.com/wimwenigerkind/odoopack-spec/name"
 	"github.com/wimwenigerkind/odoopack-spec/registryapi"
 	"gorm.io/gorm"
@@ -20,14 +20,7 @@ import (
 
 func depsTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_DSN")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_DSN not set")
-	}
-	db, err := database.Connect(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := testdb.Open(t, database.Connect)
 	if err := database.Migrate(db, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -40,8 +33,7 @@ type depsFixture struct {
 	modules                        map[string]string
 }
 
-// seedDeps creates addons under a random vendor, so that the module names the
-// fixture depends on are its own however many rows the shared database holds.
+// seedDeps creates addons under a random vendor.
 func seedDeps(t *testing.T, db *gorm.DB) depsFixture {
 	t.Helper()
 	vendor := "acme" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12]

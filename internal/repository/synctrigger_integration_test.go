@@ -3,7 +3,6 @@
 package repository_test
 
 import (
-	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -13,17 +12,11 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/database"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
+	"github.com/wimwenigerkind/odoopack-registry/internal/testdb"
 )
 
 func TestSyncTriggerClaimAllowsOnePerInterval(t *testing.T) {
-	dsn := os.Getenv("TEST_DATABASE_DSN")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_DSN not set")
-	}
-	db, err := database.Connect(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := testdb.Open(t, database.Connect)
 	if err := database.Migrate(db, nil); err != nil {
 		t.Fatal(err)
 	}

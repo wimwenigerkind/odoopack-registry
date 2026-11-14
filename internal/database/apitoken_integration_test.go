@@ -3,7 +3,6 @@
 package database
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/apitoken"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
+	"github.com/wimwenigerkind/odoopack-registry/internal/testdb"
 	"gorm.io/gorm"
 )
 
@@ -25,22 +25,11 @@ type legacyApiToken struct {
 
 func (legacyApiToken) TableName() string { return "api_tokens" }
 
-// testDB needs a disposable Postgres database in TEST_DATABASE_DSN; the tests
-// drop and recreate api_tokens there.
+// testDB connects to an empty schema of its own, so a test can lay out a
+// legacy table before the first migration.
 func testDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_DSN")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_DSN not set")
-	}
-	db, err := Connect(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Migrator().DropTable("api_tokens"); err != nil {
-		t.Fatal(err)
-	}
-	return db
+	return testdb.Open(t, Connect)
 }
 
 func TestMigrateCreatesApiTokens(t *testing.T) {

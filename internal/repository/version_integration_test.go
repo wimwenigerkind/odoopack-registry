@@ -3,7 +3,6 @@
 package repository_test
 
 import (
-	"os"
 	"sync"
 	"testing"
 
@@ -11,19 +10,13 @@ import (
 	"github.com/wimwenigerkind/odoopack-registry/internal/database"
 	"github.com/wimwenigerkind/odoopack-registry/internal/models"
 	"github.com/wimwenigerkind/odoopack-registry/internal/repository"
+	"github.com/wimwenigerkind/odoopack-registry/internal/testdb"
 )
 
 // Two writers starting a build of the same version must end with one row that
 // both of them hold the id of, and a ready version keeps its last good build.
 func TestStartBuildConcurrentWritersShareOneRow(t *testing.T) {
-	dsn := os.Getenv("TEST_DATABASE_DSN")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_DSN not set")
-	}
-	db, err := database.Connect(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := testdb.Open(t, database.Connect)
 	if err := database.Migrate(db, nil); err != nil {
 		t.Fatal(err)
 	}
