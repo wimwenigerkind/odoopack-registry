@@ -1,3 +1,4 @@
+{{- $tmpMiB := include "odoopack.workerTmpMiB" . | atoi }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -27,6 +28,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "odoopack.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
       {{- /* A stopping worker finishes the job in hand, so it gets the job timeout and two minutes to spare. */}}
       terminationGracePeriodSeconds: {{ add (include "odoopack.jobTimeoutSeconds" . | atoi) 120 }}
       {{- with .Values.podSecurityContext }}
@@ -61,31 +63,37 @@ spec:
           ports:
             - name: health
               containerPort: {{ .Values.worker.healthPort }}
+          {{- /* /readyz gives its database ping 3s, so the probe waits longer than that. */}}
           livenessProbe:
             httpGet:
               path: /healthz
               port: health
             initialDelaySeconds: 10
             periodSeconds: 15
+            timeoutSeconds: 3
           readinessProbe:
             httpGet:
               path: /readyz
               port: health
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
           volumeMounts:
             - name: config
               mountPath: /data/config.yaml
               subPath: config.yaml
               readOnly: true
-          {{- with .Values.worker.resources }}
+            - name: tmp
+              mountPath: /tmp
           resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+            {{- include "odoopack.resourcesWithTmp" (dict "resources" .Values.worker.resources "request" (printf "%dMi" $tmpMiB) "tmpMiB" $tmpMiB) | nindent 12 }}
       volumes:
         - name: config
           configMap:
             name: {{ include "odoopack.fullname" . }}-config
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ $tmpMiB }}Mi
       {{- with .Values.worker.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -4,10 +4,18 @@ metadata:
   name: {{ include "odoopack.fullname" . }}-test-connection
   labels:
     {{- include "odoopack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test
   annotations:
     helm.sh/hook: test
 spec:
   restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
   containers:
     - name: healthz
       image: busybox:1.37
@@ -16,3 +24,16 @@ spec:
         - "--spider"
         - "-S"
         - "http://{{ include "odoopack.fullname" . }}-web:{{ .Values.web.service.port }}/healthz"
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 100m
+          memory: 32Mi

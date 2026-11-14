@@ -15,23 +15,52 @@ imagePullSecrets: []
 
 serviceAccount:
   create: true
-  automount: true
+  # No pod talks to the Kubernetes API, so none gets a token. Applies to the
+  # ServiceAccount and to every pod spec.
+  automount: false
   annotations: {}
   name: ""
 
-podSecurityContext: {}
+# Pod securityContext of the web and worker pods. The backend image runs as
+# 65532:65532. No volume of the chart needs fsGroup: the emptyDirs are world
+# writable and the ConfigMap is read only.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
 
-securityContext: {}
+# Container securityContext of web, worker and the migrate init container.
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
 
 # HTTP API server.
 web:
   replicaCount: 1
   port: 6969
-  resources: {}
+  # ephemeral-storage is derived from the size of /tmp unless set here, see
+  # the README.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
   podAnnotations: {}
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  # Each entry gets a labelSelector for the web pods unless it has one.
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
   service:
     type: ClusterIP
     port: 6969
@@ -41,8 +70,8 @@ web:
     maxReplicas: 6
     targetCPUUtilizationPercentage: 80
   podDisruptionBudget:
-    enabled: false
-    minAvailable: 1
+    enabled: true
+    maxUnavailable: 1
 
 # Background worker that clones repos and builds zipballs.
 worker:
@@ -50,14 +79,22 @@ worker:
   healthPort: 6970
   # The termination grace period is limits.job_timeout plus two minutes, so a
   # stopping worker finishes the job in hand.
-  resources: {}
+  # ephemeral-storage is derived from the size of /tmp unless set here, see
+  # the README.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
   podAnnotations: {}
   nodeSelector: {}
   tolerations: []
   affinity: {}
   podDisruptionBudget:
-    enabled: false
-    minAvailable: 1
+    enabled: true
+    maxUnavailable: 1
 
 # Static frontend served by nginx.
 frontend:
@@ -69,7 +106,30 @@ frontend:
     pullPolicy: IfNotPresent
   replicaCount: 1
   port: 8080
-  resources: {}
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+      ephemeral-storage: 16Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+      ephemeral-storage: 128Mi
+  # nginx keeps its pid file and temp files in /tmp.
+  tmpSizeLimit: 64Mi
+  # The unprivileged nginx image runs as 101:101.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    runAsGroup: 101
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
   podAnnotations: {}
   nodeSelector: {}
   tolerations: []
@@ -84,7 +144,13 @@ frontend:
 # Disable only when you run the migrate binary yourself before each upgrade.
 migration:
   enabled: true
-  resources: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
 
 # Non-secret application config, rendered to config.yaml and read by viper.
 config:
@@ -108,6 +174,10 @@ config:
   # REDIS_URL in secrets or existingSecret.
   session:
     store: redis
+  # Builds one worker pod runs at once. The worker's /tmp sizeLimit and
+  # ephemeral-storage follow from it, see the README.
+  worker:
+    count: 2
   # auth.cookie_secure follows the scheme of base_url unless set explicitly.
   log:
     level: info
@@ -119,8 +189,9 @@ config:
 limits:
   # Largest zip of one version; at most clone_max_size.
   zip_max_size: 100MiB
-  # Largest shallow clone a build may write to disk; each worker needs
-  # worker.count times this in free temp space.
+  # Largest shallow clone a build may write to disk; each worker pod needs
+  # config.worker.count times this plus zip_max_size in /tmp, and the chart
+  # sizes /tmp from it.
   clone_max_size: 1GiB
   # Newest release tags and branches one sync builds.
   tags_per_sync: 50
@@ -158,5 +229,62 @@ ingress:
     - /auth
     - /integrations
     - /webhooks
-    - /healthz
-    - /readyz
+
+# NetworkPolicies for the release's pods: deny all ingress and egress, then
+# allow what each component needs. Needs a CNI that enforces NetworkPolicy.
+# Peers are NetworkPolicyPeer lists (podSelector, namespaceSelector, ipBlock).
+networkPolicy:
+  enabled: false
+  # Where the ingress controller runs; may reach web and frontend.
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+  dns:
+    to:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+        podSelector:
+          matchLabels:
+            k8s-app: kube-dns
+    port: 53
+  # Required when enabled: web and worker reach Postgres here.
+  postgres:
+    to: []
+    port: 5432
+  # Required when enabled and session.store is redis: web reaches Redis here.
+  redis:
+    to: []
+    port: 6379
+  # S3 inside the cluster or a private network; leave empty when S3 is on a
+  # public address, which the internet rule below already allows on 443.
+  s3:
+    to: []
+    ports:
+      - 443
+  # Egress from web and worker to public addresses: git clones over https and
+  # ssh, OAuth providers. This is the second line behind the SSRF check that
+  # resolves every git host and refuses internal addresses before it clones.
+  internet:
+    enabled: true
+    ports:
+      - 443
+      - 22
+    ipBlocks:
+      - cidr: 0.0.0.0/0
+        except:
+          - 0.0.0.0/8
+          - 10.0.0.0/8
+          - 100.64.0.0/10
+          - 127.0.0.0/8
+          - 169.254.0.0/16
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+      - cidr: ::/0
+        except:
+          - ::1/128
+          - fc00::/7
+          - fe80::/10
+  # Further egress rules for web and worker (NetworkPolicyEgressRule list).
+  extraEgress: []

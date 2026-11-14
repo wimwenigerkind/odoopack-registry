@@ -1,0 +1,129 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+{{- $fullName := include "odoopack.fullname" . }}
+{{- $cfg := include "odoopack.config" . | fromYaml }}
+{{- $useRedis := eq (toString (dig "session" "store" "" $cfg)) "redis" }}
+{{- if not $np.postgres.to }}
+{{- fail "networkPolicy.postgres.to must name where Postgres runs; an empty list would allow every destination" }}
+{{- end }}
+{{- if and $useRedis (not $np.redis.to) }}
+{{- fail "networkPolicy.redis.to must name where Redis runs; an empty list would allow every destination" }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullName }}-default-deny
+  labels:
+    {{- include "odoopack.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "odoopack.selectorLabels" . | nindent 6 }}
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [web, worker, frontend]
+  policyTypes:
+    - Ingress
+    - Egress
+{{- range $component := list "web" "worker" }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullName }}-{{ $component }}
+  labels:
+    {{- include "odoopack.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "odoopack.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $component }}
+  policyTypes:
+    {{- if eq $component "web" }}
+    - Ingress
+    {{- end }}
+    - Egress
+  {{- if eq $component "web" }}
+  ingress:
+    - from:
+        {{- toYaml $np.ingressFrom | nindent 8 }}
+        {{- /* The helm test pod checks /healthz through the web Service. */}}
+        - podSelector:
+            matchLabels:
+              {{- include "odoopack.selectorLabels" $ | nindent 14 }}
+              app.kubernetes.io/component: test
+      ports:
+        - protocol: TCP
+          port: {{ $.Values.web.port }}
+  {{- end }}
+  egress:
+    - to:
+        {{- toYaml $np.dns.to | nindent 8 }}
+      ports:
+        - protocol: UDP
+          port: {{ $np.dns.port }}
+        - protocol: TCP
+          port: {{ $np.dns.port }}
+    - to:
+        {{- toYaml $np.postgres.to | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ $np.postgres.port }}
+    {{- if and $useRedis (eq $component "web") }}
+    - to:
+        {{- toYaml $np.redis.to | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ $np.redis.port }}
+    {{- end }}
+    {{- with $np.s3.to }}
+    - to:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        {{- range $np.s3.ports }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+    {{- end }}
+    {{- if $np.internet.enabled }}
+    - to:
+        {{- range $np.internet.ipBlocks }}
+        - ipBlock:
+            {{- toYaml . | nindent 12 }}
+        {{- end }}
+      ports:
+        {{- range $np.internet.ports }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+    {{- end }}
+    {{- with $np.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
+{{- if .Values.frontend.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullName }}-frontend
+  labels:
+    {{- include "odoopack.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "odoopack.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        {{- toYaml $np.ingressFrom | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.frontend.port }}
+{{- end }}
+{{- end }}

@@ -1,3 +1,5 @@
+{{- include "odoopack.validate" . }}
+{{- $tmpMiB := include "odoopack.webTmpMiB" . | atoi }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,6 +31,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "odoopack.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -62,6 +65,8 @@ spec:
               mountPath: /data/config.yaml
               subPath: config.yaml
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
           {{- with .Values.migration.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -97,31 +102,41 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.web.port }}
+          {{- /* /readyz gives its checks 3s, so the probe waits longer than that. */}}
           livenessProbe:
             httpGet:
               path: /healthz
               port: http
             initialDelaySeconds: 10
             periodSeconds: 15
+            timeoutSeconds: 3
           readinessProbe:
             httpGet:
               path: /readyz
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
           volumeMounts:
             - name: config
               mountPath: /data/config.yaml
               subPath: config.yaml
               readOnly: true
-          {{- with .Values.web.resources }}
+            - name: tmp
+              mountPath: /tmp
           resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+            {{- include "odoopack.resourcesWithTmp" (dict "resources" .Values.web.resources "request" "256Mi" "tmpMiB" $tmpMiB) | nindent 12 }}
       volumes:
         - name: config
           configMap:
             name: {{ include "odoopack.fullname" . }}-config
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ $tmpMiB }}Mi
+      {{- with .Values.web.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- include "odoopack.topologySpread" (dict "ctx" $ "component" "web" "constraints" .) | nindent 8 }}
+      {{- end }}
       {{- with .Values.web.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

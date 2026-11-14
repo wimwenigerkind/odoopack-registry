@@ -27,7 +27,8 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "odoopack.serviceAccountName" . }}
-      {{- with .Values.podSecurityContext }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      {{- with .Values.frontend.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -35,6 +36,10 @@ spec:
         - name: frontend
           image: {{ include "odoopack.frontendImage" . | quote }}
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          {{- with .Values.frontend.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.frontend.port }}
@@ -44,16 +49,25 @@ spec:
               port: http
             initialDelaySeconds: 5
             periodSeconds: 15
+            timeoutSeconds: 3
           readinessProbe:
             httpGet:
               path: /
               port: http
             initialDelaySeconds: 3
             periodSeconds: 10
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           {{- with .Values.frontend.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.frontend.tmpSizeLimit }}
       {{- with .Values.frontend.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

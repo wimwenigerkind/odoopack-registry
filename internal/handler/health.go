@@ -26,8 +26,9 @@ func (h *HealthHandler) Live(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
-// Ready answers with a bare status: /readyz is reachable through the ingress,
-// and a check error can name hosts, users or database details.
+// Ready answers with a bare status: the chart keeps /readyz out of the
+// ingress, but another ingress may route it, and a check error can name hosts,
+// users or database details.
 func (h *HealthHandler) Ready(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 	defer cancel()

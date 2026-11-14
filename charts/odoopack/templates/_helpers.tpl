@@ -121,3 +121,104 @@ accepts the subset made of whole hours, minutes and seconds ("10m", "1h30m",
 {{- end -}}
 {{- $total -}}
 {{- end }}
+
+{{/*
+A size in the units the backend accepts (plain bytes or KiB, MiB, GiB, TiB,
+case insensitive), rounded up to whole MiB. Takes a list of the size and the
+key it came from, for the error message.
+*/}}
+{{- define "odoopack.sizeMiB" -}}
+{{- $v := index . 0 -}}
+{{- $key := index . 1 -}}
+{{- /* YAML reads a plain byte count as a float, which toString would print in exponent notation. */ -}}
+{{- $s := ternary (printf "%d" (int64 $v)) (toString $v) (kindIs "float64" $v) | trim -}}
+{{- if not (regexMatch "^[0-9]+ *(?i:b|kib|mib|gib|tib)?$" $s) -}}
+{{- fail (printf "%s %q must be plain bytes or KiB, MiB, GiB or TiB" $key $s) -}}
+{{- end -}}
+{{- $n := regexFind "^[0-9]+" $s | atoi -}}
+{{- $unit := regexFind "[a-zA-Z]+$" $s | lower -}}
+{{- $bytes := mul $n (get (dict "" 1 "b" 1 "kib" 1024 "mib" 1048576 "gib" 1073741824 "tib" 1099511627776) $unit) -}}
+{{- div (add $bytes 1048575) 1048576 -}}
+{{- end }}
+
+{{/*
+Temp space in MiB that one build needs: the clone and the zip made from it
+exist side by side until the clone is removed.
+*/}}
+{{- define "odoopack.buildTmpMiB" -}}
+{{- $limits := (include "odoopack.config" . | fromYaml).limits | default dict -}}
+{{- $clone := include "odoopack.sizeMiB" (list (required "limits.clone_max_size is required" $limits.clone_max_size) "limits.clone_max_size") | atoi -}}
+{{- $zip := include "odoopack.sizeMiB" (list (required "limits.zip_max_size is required" $limits.zip_max_size) "limits.zip_max_size") | atoi -}}
+{{- add $clone $zip -}}
+{{- end }}
+
+{{/*
+sizeLimit of the worker's /tmp in MiB: worker.count builds at once.
+*/}}
+{{- define "odoopack.workerTmpMiB" -}}
+{{- $worker := (include "odoopack.config" . | fromYaml).worker | default dict -}}
+{{- $count := int64 (required "config.worker.count is required" $worker.count) -}}
+{{- if lt $count 1 -}}
+{{- fail "config.worker.count must be at least 1" -}}
+{{- end -}}
+{{- mul $count (include "odoopack.buildTmpMiB" . | atoi) -}}
+{{- end }}
+
+{{/*
+sizeLimit of the web pods' /tmp in MiB. Web clones only to rebuild a pinned
+zip that is missing from storage, which is rare; room for two at once keeps a
+burst of them from getting the pod evicted.
+*/}}
+{{- define "odoopack.webTmpMiB" -}}
+{{- mul 2 (include "odoopack.buildTmpMiB" . | atoi) -}}
+{{- end }}
+
+{{/*
+Container resources with ephemeral-storage filled in from the /tmp size,
+unless the values set it. The limit leaves 256Mi above /tmp for logs and the
+writable layer, because the kubelet counts the emptyDir against the pod's
+ephemeral-storage limit. Takes a dict with resources, request and tmpMiB.
+*/}}
+{{- define "odoopack.resourcesWithTmp" -}}
+{{- $res := deepCopy (.resources | default dict) -}}
+{{- $requests := $res.requests | default dict -}}
+{{- $limits := $res.limits | default dict -}}
+{{- if not (hasKey $requests "ephemeral-storage") -}}
+{{- $_ := set $requests "ephemeral-storage" .request -}}
+{{- end -}}
+{{- if not (hasKey $limits "ephemeral-storage") -}}
+{{- $_ := set $limits "ephemeral-storage" (printf "%dMi" (add .tmpMiB 256)) -}}
+{{- end -}}
+{{- $_ := set $res "requests" $requests -}}
+{{- $_ := set $res "limits" $limits -}}
+{{- toYaml $res -}}
+{{- end }}
+
+{{/*
+Topology spread constraints of a component, each with a labelSelector for the
+component's pods unless it brings its own. Takes a dict with ctx, component
+and constraints.
+*/}}
+{{- define "odoopack.topologySpread" -}}
+{{- $labels := include "odoopack.selectorLabels" .ctx | fromYaml -}}
+{{- $_ := set $labels "app.kubernetes.io/component" .component -}}
+{{- $out := list -}}
+{{- range .constraints -}}
+{{- $out = append $out (merge (dict) . (dict "labelSelector" (dict "matchLabels" $labels))) -}}
+{{- end -}}
+{{- toYaml $out -}}
+{{- end }}
+
+{{/*
+Refuse settings that only work in a single web process.
+*/}}
+{{- define "odoopack.validate" -}}
+{{- $cfg := include "odoopack.config" . | fromYaml -}}
+{{- $multi := or .Values.web.autoscaling.enabled (gt (int .Values.web.replicaCount) 1) -}}
+{{- if and $multi (eq (toString (dig "session" "store" "" $cfg)) "memory") -}}
+{{- fail "session.store memory keeps sessions in one process; use redis with more than one web replica or autoscaling" -}}
+{{- end -}}
+{{- if and $multi (eq (toString (dig "storage" "driver" "" $cfg)) "local") -}}
+{{- fail "storage.driver local keeps files on one pod; use s3 with more than one web replica or autoscaling" -}}
+{{- end -}}
+{{- end }}

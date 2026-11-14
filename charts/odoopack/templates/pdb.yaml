@@ -7,7 +7,7 @@ metadata:
     {{- include "odoopack.labels" . | nindent 4 }}
     app.kubernetes.io/component: web
 spec:
-  minAvailable: {{ .Values.web.podDisruptionBudget.minAvailable }}
+  maxUnavailable: {{ .Values.web.podDisruptionBudget.maxUnavailable }}
   selector:
     matchLabels:
       {{- include "odoopack.selectorLabels" . | nindent 6 }}
@@ -23,7 +23,7 @@ metadata:
     {{- include "odoopack.labels" . | nindent 4 }}
     app.kubernetes.io/component: worker
 spec:
-  minAvailable: {{ .Values.worker.podDisruptionBudget.minAvailable }}
+  maxUnavailable: {{ .Values.worker.podDisruptionBudget.maxUnavailable }}
   selector:
     matchLabels:
       {{- include "odoopack.selectorLabels" . | nindent 6 }}
