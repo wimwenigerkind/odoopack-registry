@@ -62,7 +62,7 @@ func (h *IntegrationHandler) Connect(c *gin.Context) {
 		UserID:   userID.String(),
 		ReturnTo: sanitizeReturnTo(c.Query("return_to")),
 	}, loginTTL); err != nil {
-		internalError(c, "save state", err)
+		storeError(c, "save state", err)
 		return
 	}
 

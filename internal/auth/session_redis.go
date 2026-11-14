@@ -14,21 +14,17 @@ import (
 const sessionKeyPrefix = "session:"
 
 type redisSessionStore struct {
-	client *redis.Client
+	client redisClient
+	health *redisHealth
 }
 
 func NewRedisSessionStore(url string) (SessionStore, error) {
-	opt, err := redis.ParseURL(url)
+	health := &redisHealth{store: "session"}
+	client, err := newRedisClient(url, health)
 	if err != nil {
-		return nil, fmt.Errorf("auth: parse redis url: %w", err)
+		return nil, err
 	}
-	client := redis.NewClient(opt)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("auth: redis ping: %w", err)
-	}
-	return &redisSessionStore{client: client}, nil
+	return &redisSessionStore{client: client, health: health}, nil
 }
 
 func (s *redisSessionStore) key(id string) string {
@@ -49,18 +45,19 @@ func (s *redisSessionStore) Create(userID uuid.UUID, ttl time.Duration, userAgen
 	if err != nil {
 		return Session{}, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), redisTimeout)
 	defer cancel()
-	if err := s.client.Set(ctx, s.key(sess.ID), data, ttl).Err(); err != nil {
+	if err := s.health.observe(s.client.Set(ctx, s.key(sess.ID), data, ttl).Err()); err != nil {
 		return Session{}, fmt.Errorf("auth: redis set session: %w", err)
 	}
 	return sess, nil
 }
 
 func (s *redisSessionStore) Get(id string) (Session, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), redisTimeout)
 	defer cancel()
 	data, err := s.client.Get(ctx, s.key(id)).Bytes()
+	err = s.health.observe(err)
 	if errors.Is(err, redis.Nil) {
 		return Session{}, ErrSessionNotFound
 	}
@@ -79,15 +76,11 @@ func (s *redisSessionStore) Get(id string) (Session, error) {
 }
 
 func (s *redisSessionStore) Delete(id string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), redisTimeout)
 	defer cancel()
-	return s.client.Del(ctx, s.key(id)).Err()
+	return s.health.observe(s.client.Del(ctx, s.key(id)).Err())
 }
 
 func (s *redisSessionStore) Stop() {
 	_ = s.client.Close()
-}
-
-func (s *redisSessionStore) Ping(ctx context.Context) error {
-	return s.client.Ping(ctx).Err()
 }

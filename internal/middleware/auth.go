@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -20,7 +22,11 @@ const (
 
 func RequireAdmin(sessions auth.SessionStore, users *repository.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		sess, ok := loadSession(c, sessions)
+		sess, ok, err := loadSession(c, sessions)
+		if err != nil {
+			abortStoreUnavailable(c)
+			return
+		}
 		if !ok || sess.UserID == uuid.Nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
 			return
@@ -38,7 +44,11 @@ func RequireAdmin(sessions auth.SessionStore, users *repository.UserRepository) 
 
 func RequireAuth(sessions auth.SessionStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		sess, ok := loadSession(c, sessions)
+		sess, ok, err := loadSession(c, sessions)
+		if err != nil {
+			abortStoreUnavailable(c)
+			return
+		}
 		if !ok || sess.UserID == uuid.Nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
 			return
@@ -51,7 +61,12 @@ func RequireAuth(sessions auth.SessionStore) gin.HandlerFunc {
 
 func OptionalAuth(sessions auth.SessionStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if sess, ok := loadSession(c, sessions); ok && sess.UserID != uuid.Nil {
+		sess, ok, err := loadSession(c, sessions)
+		if err != nil {
+			// The store logs the outage once; the caller continues as anonymous.
+			slog.Debug("session store unavailable, continuing anonymously", "err", err)
+		}
+		if ok && sess.UserID != uuid.Nil {
 			c.Set(contextKeyUserID, sess.UserID)
 			c.Set(contextKeySession, sess)
 		}
@@ -117,14 +132,25 @@ func CurrentSession(c *gin.Context) (auth.Session, bool) {
 	return sess, ok
 }
 
-func loadSession(c *gin.Context, sessions auth.SessionStore) (auth.Session, bool) {
+// loadSession returns an error only when the store cannot be reached; a
+// missing, unknown or expired session is not ok and no error.
+func loadSession(c *gin.Context, sessions auth.SessionStore) (auth.Session, bool, error) {
 	cookie, err := c.Cookie(auth.SessionCookieName)
 	if err != nil || cookie == "" {
-		return auth.Session{}, false
+		return auth.Session{}, false, nil
 	}
 	sess, err := sessions.Get(cookie)
-	if err != nil {
-		return auth.Session{}, false
+	if errors.Is(err, auth.ErrStoreUnavailable) {
+		return auth.Session{}, false, err
 	}
-	return sess, true
+	if err != nil {
+		return auth.Session{}, false, nil
+	}
+	return sess, true, nil
+}
+
+// abortStoreUnavailable answers 503 so a client can tell a Redis outage from
+// a logged out session and retry instead of sending the user to log in.
+func abortStoreUnavailable(c *gin.Context) {
+	c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "session store unavailable"})
 }

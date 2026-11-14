@@ -63,6 +63,16 @@ func internalError(c *gin.Context, op string, err error) {
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 }
 
+// storeError answers 503 when the session or state store cannot be reached;
+// the store has already logged the outage, so it is not logged per request.
+func storeError(c *gin.Context, op string, err error) {
+	if errors.Is(err, auth.ErrStoreUnavailable) {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "session store unavailable"})
+		return
+	}
+	internalError(c, op, err)
+}
+
 func (h *AuthHandler) Link(c *gin.Context) {
 	userID, ok := middleware.CurrentUserID(c)
 	if !ok {
@@ -88,7 +98,7 @@ func (h *AuthHandler) Link(c *gin.Context) {
 		ReturnTo: sanitizeReturnTo(c.Query("return_to")),
 		UserID:   userID.String(),
 	}, loginTTL); err != nil {
-		internalError(c, "save state", err)
+		storeError(c, "save state", err)
 		return
 	}
 
@@ -114,7 +124,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Verifier: verifier,
 		ReturnTo: sanitizeReturnTo(c.Query("return_to")),
 	}, loginTTL); err != nil {
-		internalError(c, "save state", err)
+		storeError(c, "save state", err)
 		return
 	}
 
@@ -151,6 +161,10 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	}
 
 	fs, err := h.stateStore.Take(urlState)
+	if errors.Is(err, auth.ErrStoreUnavailable) {
+		storeError(c, "take state", err)
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or expired state"})
 		return
@@ -203,7 +217,7 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 
 	sess, err := h.sessions.Create(user.ID, sessionTTL, c.GetHeader("User-Agent"), c.ClientIP())
 	if err != nil {
-		internalError(c, "create session", err)
+		storeError(c, "create session", err)
 		return
 	}
 	h.writeCookie(c, auth.SessionCookieName, sess.ID, sessionCookiePath, int(sessionTTL.Seconds()))

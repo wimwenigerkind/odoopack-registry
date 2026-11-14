@@ -151,21 +151,13 @@ func main() {
 	sameOrigin := middleware.SameOrigin(append([]string{baseURL}, origins...))
 	registerRoutes(r, mode, addonHandler, repoHandler, downloadHandler, triggerHandler, registryHandler, authHandler, groupHandler, userHandler, tokenHandler, integrationHandler, webhookHandler, requireAuth, requireAdmin, optionalAuth, apiKeyOptional, sameOrigin)
 
-	healthChecks := []handler.HealthCheck{
-		{Name: "database", Fn: func(ctx context.Context) error {
-			sqlDB, err := db.DB()
-			if err != nil {
-				return err
-			}
-			return sqlDB.PingContext(ctx)
-		}},
-	}
-	if pinger, ok := sessionStore.(interface{ Ping(context.Context) error }); ok {
-		healthChecks = append(healthChecks, handler.HealthCheck{Name: "redis", Fn: pinger.Ping})
-	}
-	healthHandler := handler.NewHealthHandler(healthChecks...)
-	r.GET("/healthz", healthHandler.Live)
-	r.GET("/readyz", healthHandler.Ready)
+	registerHealth(r, func(ctx context.Context) error {
+		sqlDB, err := db.DB()
+		if err != nil {
+			return err
+		}
+		return sqlDB.PingContext(ctx)
+	})
 
 	addr := viper.GetString("server_address")
 	srv := &http.Server{
@@ -261,6 +253,15 @@ func registerRoutes(r *gin.Engine, mode string, addons *handler.AddonHandler, re
 	r.GET("/integrations/:provider/connect", requireAuth, integrations.Connect)
 
 	r.POST("/webhooks/forgejo", webhooks.Forgejo)
+}
+
+// registerHealth leaves Redis out of readiness on purpose: it only holds
+// sessions and login states, and a Redis outage must not take every pod out
+// of the service and stop CLI installs, which need the database and storage.
+func registerHealth(r *gin.Engine, pingDB func(context.Context) error) {
+	h := handler.NewHealthHandler(handler.HealthCheck{Name: "database", Fn: pingDB})
+	r.GET("/healthz", h.Live)
+	r.GET("/readyz", h.Ready)
 }
 
 // ginMode defaults to release mode, whose recovery output leaves out the

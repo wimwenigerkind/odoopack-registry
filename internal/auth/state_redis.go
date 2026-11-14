@@ -13,21 +13,17 @@ import (
 const stateKeyPrefix = "oauth_state:"
 
 type redisStateStore struct {
-	client *redis.Client
+	client redisClient
+	health *redisHealth
 }
 
 func NewRedisStateStore(url string) (StateStore, error) {
-	opt, err := redis.ParseURL(url)
+	health := &redisHealth{store: "oauth state"}
+	client, err := newRedisClient(url, health)
 	if err != nil {
-		return nil, fmt.Errorf("auth: parse redis url: %w", err)
+		return nil, err
 	}
-	client := redis.NewClient(opt)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("auth: redis ping: %w", err)
-	}
-	return &redisStateStore{client: client}, nil
+	return &redisStateStore{client: client, health: health}, nil
 }
 
 func (s *redisStateStore) key(state string) string {
@@ -39,18 +35,19 @@ func (s *redisStateStore) Save(state string, fs FlowState, ttl time.Duration) er
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), redisTimeout)
 	defer cancel()
-	if err := s.client.Set(ctx, s.key(state), data, ttl).Err(); err != nil {
+	if err := s.health.observe(s.client.Set(ctx, s.key(state), data, ttl).Err()); err != nil {
 		return fmt.Errorf("auth: redis set state: %w", err)
 	}
 	return nil
 }
 
 func (s *redisStateStore) Take(state string) (FlowState, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), redisTimeout)
 	defer cancel()
 	data, err := s.client.GetDel(ctx, s.key(state)).Bytes()
+	err = s.health.observe(err)
 	if errors.Is(err, redis.Nil) {
 		return FlowState{}, ErrStateNotFound
 	}
