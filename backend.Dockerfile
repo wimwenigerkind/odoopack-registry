@@ -7,9 +7,14 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/web ./cmd/web
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/worker ./cmd/worker
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/migrate ./cmd/migrate
+# CI passes the release (1.2.3) or main-<sha>, empty when no tag applies; the
+# binaries log it at start and web answers it on /healthz.
+ARG VERSION
+ENV LDFLAGS="-s -w -X github.com/wimwenigerkind/odoopack-registry/internal/buildinfo.Version=${VERSION:-dev}"
+
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="${LDFLAGS}" -o /out/web ./cmd/web
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="${LDFLAGS}" -o /out/worker ./cmd/worker
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="${LDFLAGS}" -o /out/migrate ./cmd/migrate
 
 FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 

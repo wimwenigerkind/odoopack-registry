@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/wimwenigerkind/odoopack-registry/internal/buildinfo"
 )
 
 type HealthCheck struct {
@@ -22,8 +23,10 @@ func NewHealthHandler(checks ...HealthCheck) *HealthHandler {
 	return &HealthHandler{checks: checks}
 }
 
+// Live names the release so a running pod tells which one it is. Unlike the
+// check errors Ready leaves out, the version of a public release is no secret.
 func (h *HealthHandler) Live(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "version": buildinfo.Version})
 }
 
 // Ready answers with a bare status: the chart keeps /readyz out of the

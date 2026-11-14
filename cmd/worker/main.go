@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
 	"github.com/wimwenigerkind/odoopack-registry/internal/bootstrap"
+	"github.com/wimwenigerkind/odoopack-registry/internal/buildinfo"
 	"github.com/wimwenigerkind/odoopack-registry/internal/config"
 	"github.com/wimwenigerkind/odoopack-registry/internal/database"
 	"github.com/wimwenigerkind/odoopack-registry/internal/logger"
@@ -68,7 +69,7 @@ func main() {
 
 	consumer := worker.NewConsumer(db, versionRepo, integrationRepo, authRegistry, store, viper.GetDuration("worker.poll_interval"), limits)
 	workers := viper.GetInt("worker.count")
-	slog.Info("starting worker", "workers", workers)
+	slog.Info("starting worker", "workers", workers, "version", buildinfo.Version)
 	consumer.Run(ctx, workers)
 
 	<-ctx.Done()

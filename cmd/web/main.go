@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wimwenigerkind/odoopack-registry/internal/auth"
 	"github.com/wimwenigerkind/odoopack-registry/internal/bootstrap"
+	"github.com/wimwenigerkind/odoopack-registry/internal/buildinfo"
 	"github.com/wimwenigerkind/odoopack-registry/internal/config"
 	"github.com/wimwenigerkind/odoopack-registry/internal/database"
 	"github.com/wimwenigerkind/odoopack-registry/internal/git"
@@ -173,7 +174,7 @@ func main() {
 	defer stop()
 
 	go func() {
-		slog.Info("starting web server", "addr", addr)
+		slog.Info("starting web server", "addr", addr, "version", buildinfo.Version)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			bootstrap.Fatal("server", err)
 		}
