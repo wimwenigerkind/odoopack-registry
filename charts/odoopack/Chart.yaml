@@ -2,7 +2,7 @@ apiVersion: v2
 name: odoopack
 description: Odoo addon package registry with web API, background worker and frontend
 type: application
-version: 0.4.0
+version: 0.5.0
 # Replaced by the release tag when CI packages the chart (helm package
 # --app-version), so a published chart defaults to the images of its release.
 appVersion: "0.1.0"
