@@ -68,7 +68,7 @@ frontend:
     tag: latest
     pullPolicy: IfNotPresent
   replicaCount: 1
-  port: 80
+  port: 8080
   resources: {}
   podAnnotations: {}
   nodeSelector: {}

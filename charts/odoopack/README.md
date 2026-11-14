@@ -35,6 +35,7 @@ Non-secret settings live under `config` and are rendered into a `config.yaml` th
 | `image.tag` | chart appVersion | Backend image tag |
 | `frontend.image.repository` | `wimwenigerkind/odoopack-registry-frontend` | Frontend image |
 | `frontend.enabled` | `true` | Deploy the frontend |
+| `frontend.port` | `8080` | Port the unprivileged nginx listens on; the frontend Service stays on port 80 |
 | `web.replicaCount` | `1` | Web replicas |
 | `web.autoscaling.enabled` | `false` | HPA for the web deployment |
 | `worker.replicaCount` | `1` | Worker replicas |
@@ -63,6 +64,19 @@ During a rolling update the old pods keep serving while a new pod migrates, so a
 The worker does not migrate. Until a migration has created the schema it waits, checking with a backoff of up to 30 seconds, and starts taking jobs afterwards.
 
 Set `migration.enabled: false` only if you run `migrate` yourself, against the same database and with the same config and Secret, before every upgrade.
+
+### Images
+
+Both images run as non-root users and work with a read-only root filesystem.
+
+The backend image (web, worker, migrate) runs as uid and gid `65532`. It writes only to:
+
+- `/tmp` (`os.TempDir()`, override with `TMPDIR`): the worker's clones and zips, up to `limits.clone_max_size` per running job; web may buffer request bodies there. Mount an `emptyDir` here when the root filesystem is read-only.
+- `storage.local.root` (default `./data/storage`, so `/data/data/storage`): only with the `local` storage driver. Mount a volume at that path; the directory in the image belongs to uid `65532`.
+
+`HOME` is `/tmp` and git reads neither a system nor a global config (`GIT_CONFIG_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL=/dev/null`), so git needs no writable home directory. `/data/config.yaml` is read only.
+
+The frontend image is the unprivileged nginx (uid `101`) listening on `8080`. It writes its pid file and temp files to `/tmp`, so a read-only root filesystem needs an `emptyDir` there.
 
 ### Limits
 
