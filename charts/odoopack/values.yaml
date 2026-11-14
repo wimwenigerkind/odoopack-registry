@@ -7,8 +7,9 @@ fullnameOverride: ""
 image:
   registry: ghcr.io
   repository: wimwenigerkind/odoopack-registry-backend
-  # Pin to a main-<sha> tag for reproducible deploys.
-  tag: latest
+  # Empty means the chart's appVersion, the release this chart was published
+  # with; set a main-<sha> tag to run a build between releases.
+  tag: ""
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
@@ -102,7 +103,7 @@ frontend:
   image:
     registry: ghcr.io
     repository: wimwenigerkind/odoopack-registry-frontend
-    tag: latest
+    tag: ""
     pullPolicy: IfNotPresent
   replicaCount: 1
   port: 8080
