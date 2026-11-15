@@ -17,7 +17,7 @@ require (
 	github.com/wimwenigerkind/odoopack-spec v0.1.0
 	github.com/wimwenigerkind/paginate v0.2.0
 	github.com/yuin/goldmark v1.8.7
-	golang.org/x/oauth2 v0.37.0
+	golang.org/x/oauth2 v0.38.0
 	gorm.io/driver/postgres v1.6.3
 	gorm.io/gorm v1.31.2
 )
