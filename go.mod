@@ -10,7 +10,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/minio/minio-go/v7 v7.4.1
 	github.com/pb33f/libopenapi v0.41.8
-	github.com/pb33f/libopenapi-validator v0.16.2
+	github.com/pb33f/libopenapi-validator v0.16.3
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/spf13/viper v1.21.0
 	github.com/wimwenigerkind/odoo-manifest v0.1.0
