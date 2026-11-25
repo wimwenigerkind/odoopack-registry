@@ -9,8 +9,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/minio/minio-go/v7 v7.4.1
-	github.com/pb33f/libopenapi v0.41.8
-	github.com/pb33f/libopenapi-validator v0.16.2
+	github.com/pb33f/libopenapi v0.43.2
+	github.com/pb33f/libopenapi-validator v0.16.5
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/spf13/viper v1.21.0
 	github.com/wimwenigerkind/odoo-manifest v0.1.0
@@ -61,7 +61,7 @@ require (
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/pb33f/go-yaml v0.1.1 // indirect
+	github.com/pb33f/go-yaml v0.2.0 // indirect
 	github.com/pb33f/jsonpath v0.8.5 // indirect
 	github.com/pb33f/jsonschema/v6 v6.0.3 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.2 // indirect
@@ -86,9 +86,9 @@ require (
 	golang.org/x/arch v0.32.0 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
 )
