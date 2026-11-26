@@ -97,7 +97,7 @@ func registryResponse(addon *models.Addon, baseURL string) registryapi.Addon {
 			Version:   v.Version,
 			Type:      registryapi.TypeZip,
 			URL:       fmt.Sprintf("%s/registry/v1/zipball/%s/%s", baseURL, addon.ID, sum.Hex()),
-			Shasum:    sum.String(),
+			Digest:    sum.String(),
 			Reference: v.RefValue,
 			Depends:   deps,
 		}

@@ -106,13 +106,13 @@ paths:
 
         `reference` is looked up in this order:
 
-        1. A ready version whose `shasum` has this hex. This is the form the
+        1. A ready version whose `digest` has this hex. This is the form the
            `url` of a version uses.
         2. A version built from this commit id; `409` while it is not ready.
         3. An earlier build of this commit that is still in storage.
         4. Only for the repository owner or an admin: the commit is fetched
            from git and archived on demand, which can take up to two minutes.
-           `409` when the archive does not match the `shasum` published for
+           `409` when the archive does not match the `digest` published for
            that commit.
 
         Steps 2 to 4 compare the full commit id, so an abbreviated one only
@@ -127,7 +127,7 @@ paths:
         - name: reference
           in: path
           required: true
-          description: The hex of a `shasum`, or a git commit id. Case does not matter.
+          description: The hex of a `digest`, or a git commit id. Case does not matter.
           schema:
             type: string
             pattern: '^[0-9a-fA-F]{7,64}$'
@@ -160,7 +160,7 @@ paths:
           description: |
             `conflict`: the version of this commit is not ready yet (pending,
             building or failed), or an archive built on demand does not match
-            the published `shasum`.
+            the published `digest`.
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -204,7 +204,7 @@ components:
                   - version: 19.0.1.0.0
                     type: zip
                     url: https://registry.example.com/registry/v1/zipball/f1740dd9-ca0e-42fd-a63b-b553d3fd3882/ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543
-                    shasum: sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543
+                    digest: sha256:ece96e65881389c3ef6538ea26b9d7149e8e0af042c828d17283c6b76c633543
                     reference: 6b6c390a387c81ee604b602e49ca6c35646cc619
                     depends:
                       - { module: base, access: external }
@@ -286,7 +286,7 @@ components:
       type: object
       description: |
         One version of an addon (`registryapi.Version`). This registry
-        always sends `type` `zip` with `shasum` and `reference`; `git` is part
+        always sends `type` `zip` with `digest` and `reference`; `git` is part
         of the shared format for registries that let a client clone instead.
       required: [version, type, url]
       properties:
@@ -307,11 +307,11 @@ components:
           format: uri
           description: |
             Where to download the version: for `zip`
-            `<base_url>/registry/v1/zipball/<addon_id>/<hex of shasum>`
+            `<base_url>/registry/v1/zipball/<addon_id>/<hex of digest>`
             (`getZipball`). `https`, or `http` only for `localhost`,
             `127.0.0.1` and `::1`.
           pattern: '^https?://'
-        shasum:
+        digest:
           type: string
           description: The sha256 of the zip archive. Required for `zip`.
           pattern: '^sha256:[0-9a-f]{64}$'
@@ -333,7 +333,7 @@ components:
         - if:
             properties: { type: { const: zip } }
           then:
-            required: [shasum]
+            required: [digest]
         - if:
             properties: { type: { const: git } }
           then:
