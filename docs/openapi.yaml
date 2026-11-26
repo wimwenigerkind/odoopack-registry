@@ -309,7 +309,9 @@ components:
             Where to download the version: for `zip`
             `<base_url>/registry/v1/zipball/<addon_id>/<hex of digest>`
             (`getZipball`). `https`, or `http` only for `localhost`,
-            `127.0.0.1` and `::1`.
+            `127.0.0.1` and `::1`. No user info, query or fragment: the
+            client writes the url into a lockfile that a project commits,
+            so it must not carry a token or expire.
           pattern: '^https?://'
         digest:
           type: string
