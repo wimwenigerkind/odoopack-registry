@@ -258,6 +258,8 @@ github.com/wimwenigerkind/odoo-manifest v0.1.0 h1:gInCrPbX/d3PSjLo+TFc+JJS/WABIl
 github.com/wimwenigerkind/odoo-manifest v0.1.0/go.mod h1:Ok8Ze1U0875O+R0bc+JhX1W03K2EVq8VSHTjiqm6UBI=
 github.com/wimwenigerkind/odoopack-spec v0.2.0 h1:XTfKL9Q5W87jmy8r0C6pzbxIXZ0I4r9JSQQ+8XKFY+k=
 github.com/wimwenigerkind/odoopack-spec v0.2.0/go.mod h1:4ZlvWEFiW+WMz5LiYYMITj6Dsn4q0f1bb5MAI9RlKAw=
+github.com/wimwenigerkind/odoopack-spec v0.2.1 h1:xb1Vkmvn7dZgRpLN5a7lrQuD5jtWHOz9EbnGxWFZjSw=
+github.com/wimwenigerkind/odoopack-spec v0.2.1/go.mod h1:4ZlvWEFiW+WMz5LiYYMITj6Dsn4q0f1bb5MAI9RlKAw=
 github.com/wimwenigerkind/paginate v0.2.0 h1:gsF/AFG4/RlKhpCP9UHfOAu6tyXuQ6x1N7IQTQoxxKg=
 github.com/wimwenigerkind/paginate v0.2.0/go.mod h1:NVFzF4NZdjkPCUN3wRvfopZ5FDc7ozcf3xllPVRwZlw=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
